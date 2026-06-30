@@ -10,6 +10,9 @@ import {
 } from 'framer-motion';
 import { useForm, ValidationError } from '@formspree/react';
 
+// Heavy three.js showcase is code-split + mounted only when scrolled near.
+const Projects3D = React.lazy(() => import('./Projects3D'));
+
 // ==========================================
 // 1. DYNAMIC GLOBAL STYLES INJECTION
 // ==========================================
@@ -62,6 +65,11 @@ if (typeof window !== 'undefined') {
       padding: 0;
     }
 
+    html {
+      overflow-x: hidden;
+      max-width: 100vw;
+    }
+
     body, header, nav, div, section, button, a, span, h1, h2, h3, h4, h5, h6, p, ul, li {
       transition: background-color 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), 
                   color 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), 
@@ -74,19 +82,84 @@ if (typeof window !== 'undefined') {
       color: var(--txt);
       font-family: 'Inter', sans-serif;
       overflow-x: hidden;
+      max-width: 100vw;
       -webkit-font-smoothing: antialiased;
+    }
+
+    #root {
+      overflow-x: hidden;
+      max-width: 100vw;
     }
 
     /* Scrollbar Rules */
     ::-webkit-scrollbar {
-      width: 3px;
+      width: 8px;
     }
     ::-webkit-scrollbar-track {
       background: var(--bg);
     }
     ::-webkit-scrollbar-thumb {
-      background: #1e1e24;
+      background: linear-gradient(var(--a2), var(--a1));
       border-radius: 99px;
+      border: 2px solid var(--bg);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(var(--a1), var(--a3));
+    }
+
+    /* Text selection accent */
+    ::selection {
+      background: rgba(126,184,247,0.28);
+      color: var(--txt);
+    }
+
+    /* Honor system fonts gracefully + smoother rendering */
+    img { max-width: 100%; }
+    a, button { -webkit-tap-highlight-color: transparent; }
+
+    /* ── CUSTOM CURSOR (desktop / fine-pointer only, active after load) ── */
+    .cursor-dot, .cursor-ring { display: none; }
+    @media (hover: hover) and (pointer: fine) {
+      body.cc-active { cursor: none; }
+      body.cc-active a, body.cc-active button, body.cc-active [role="button"],
+      body.cc-active .skill-card, body.cc-active .pcard-inner { cursor: none; }
+      body.cc-active input, body.cc-active textarea, body.cc-active select { cursor: text; }
+      body.cc-active .cursor-dot, body.cc-active .cursor-ring { display: block; }
+    }
+
+    /* ── AURORA GRADIENT MESH (sitewide ambient color) ── */
+    .aurora-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      will-change: transform;
+      mix-blend-mode: screen;
+    }
+    [data-theme='light'] .aurora-blob {
+      mix-blend-mode: multiply;
+      opacity: 0.5;
+    }
+    @keyframes aurora-a {
+      0%, 100% { transform: translate(-8%, -6%) scale(1); }
+      50%      { transform: translate(18%, 12%) scale(1.35); }
+    }
+    @keyframes aurora-b {
+      0%, 100% { transform: translate(10%, 18%) scale(1.1); }
+      50%      { transform: translate(-16%, -12%) scale(1.45); }
+    }
+    @keyframes aurora-c {
+      0%, 100% { transform: translate(6%, -14%) scale(1.2); }
+      50%      { transform: translate(-12%, 16%) scale(0.9); }
+    }
+    @keyframes aurora-d {
+      0%, 100% { transform: translate(-14%, 12%) scale(0.95); }
+      50%      { transform: translate(12%, -16%) scale(1.3); }
+    }
+
+    /* Gradient ring border helper for cards */
+    @keyframes border-rotate {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
 
     /* Typography & Utilities */
@@ -227,6 +300,173 @@ if (typeof window !== 'undefined') {
       box-shadow: 0 0 14px rgba(59,130,246,0.2);
     }
 
+    /* ── HAMBURGER MENU ── */
+    .hamburger-btn {
+      display: none;
+      background: transparent;
+      border: 1px solid var(--stroke);
+      color: var(--txt);
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .hamburger-btn:hover {
+      border-color: var(--a1);
+      background: rgba(126,184,247,0.08);
+    }
+
+    /* Mobile drawer */
+    .mobile-drawer {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: var(--bg);            /* opaque so menu is always readable */
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      border-bottom: 1px solid var(--nav-border);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+      z-index: 201;
+      padding: 4.75rem 1.5rem 2rem;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-height: 100dvh;
+      overflow-y: auto;
+    }
+    .mobile-drawer.open {
+      display: flex;
+    }
+    .mobile-drawer-link {
+      background: transparent;
+      border: none;
+      color: var(--txt);
+      padding: 0.85rem 1rem;
+      border-radius: 0.75rem;
+      font-size: 1rem;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      text-align: left;
+      transition: background 0.2s, color 0.2s;
+    }
+    .mobile-drawer-link:hover {
+      background: rgba(126,184,247,0.08);
+      color: var(--a1);
+    }
+    .mobile-drawer-divider {
+      height: 1px;
+      background: var(--stroke);
+      margin: 0.5rem 0;
+    }
+
+    /* ── RESPONSIVE BREAKPOINTS ── */
+
+    /* Collapse nav into a hamburger early enough for tablets + small laptops */
+    @media (max-width: 900px) {
+      .hamburger-btn { display: flex !important; }
+      .desktop-nav { display: none !important; }
+      .desktop-resume-btn { display: none !important; }
+      .desktop-divider { display: none !important; }
+      .desktop-hire-btn { display: none !important; }
+    }
+
+    /* Laptops & small desktops */
+    @media (max-width: 1024px) {
+      #projects, #skills { padding: 5rem 0 !important; }
+      #contact { padding: 6rem 0 3rem !important; }
+      .about-grid { gap: 3rem !important; }
+    }
+
+    /* Tablets / large phones */
+    @media (max-width: 768px) {
+      /* Section rhythm */
+      #projects, #skills { padding: 4rem 0 !important; }
+      #contact { padding: 5rem 0 2.5rem !important; }
+
+      /* Projects grid: override span columns */
+      .projects-grid { gap: 1.1rem !important; }
+      .projects-grid > div { grid-column: span 12 !important; }
+
+      /* PCard: always column layout on mobile + tighter padding */
+      .pcard-inner {
+        flex-direction: column !important;
+        padding: 1.85rem !important;
+        gap: 1.5rem !important;
+        border-radius: 1.25rem !important;
+      }
+      .pcard-title { font-size: 2.1rem !important; }
+      .pcard-id { top: 1.4rem !important; right: 1.4rem !important; }
+
+      /* About: tighten the two-column gap + card padding */
+      .about-grid { gap: 2.25rem !important; }
+      .about-card { padding: 1.85rem !important; border-radius: 1.25rem !important; }
+
+      /* Skills card padding */
+      .skill-card { padding: 1.5rem !important; }
+
+      /* Hero role line: let it wrap instead of clipping */
+      .hero-role { height: auto !important; min-height: 2.6rem; }
+      .hero-stats { gap: 1.25rem !important; }
+    }
+
+    /* Phones */
+    @media (max-width: 480px) {
+      .hero-btns {
+        flex-direction: column !important;
+        width: 100%;
+      }
+      .hero-btns > * {
+        width: 100%;
+        justify-content: center;
+      }
+
+      #projects, #skills { padding: 3.25rem 0 !important; }
+
+      .pcard-inner { padding: 1.4rem !important; }
+      .pcard-title { font-size: 1.85rem !important; }
+      .about-card { padding: 1.5rem !important; }
+      .skill-card { padding: 1.3rem !important; }
+      .contact-cards { gap: 0.75rem !important; }
+
+      /* Tame the marquee text on tiny screens */
+      .contact-marquee span { font-size: 1rem !important; }
+
+      /* Hero stats -> clean 2 columns instead of a cramped row */
+      .hero-stats { grid-template-columns: repeat(2, 1fr) !important; }
+    }
+
+    /* Very small phones */
+    @media (max-width: 360px) {
+      .hero-stats { gap: 0.85rem !important; }
+    }
+
+    /* Short viewports (landscape phones / small laptops): trim hero so it
+       never overflows under the navbar */
+    @media (max-height: 760px) {
+      .hero-scroll { display: none !important; }
+      .hero-stats { padding-top: 1.25rem !important; }
+    }
+    @media (max-height: 640px) {
+      .hero-stats { display: none !important; }
+    }
+
+    /* Touch / coarse pointers: kill hover-tilt jitter, ease motion */
+    @media (hover: none) {
+      .pcard-inner { transform: none !important; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+
     /* ── SCROLL TO TOP FAB ── */
     .scroll-top-fab {
       position: fixed;
@@ -278,6 +518,20 @@ function useScrolled(threshold = 70) {
   return scrolled;
 }
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  // useLayoutEffect runs synchronously before paint — avoids flash
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= breakpoint);
+    check(); // run immediately on mount
+    window.addEventListener('resize', check, { passive: true });
+    return () => window.removeEventListener('resize', check);
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
 // ==========================================
 // 3. REUSABLE INFRASTRUCTURE COMPONENTS
 // ==========================================
@@ -304,7 +558,9 @@ function SpaceCanvasBackground() {
     ];
 
     let particles = [];
-    const numParticles = 140;
+    // Adaptive density: fewer particles on small screens keeps phones at 60fps
+    // (the connector loop is O(n²), so this matters a lot on mobile).
+    let numParticles = 140;
     const maxDistance = 140;
     const repulsionRadius = 140;
     const repulsionStrength = 4.5;
@@ -316,6 +572,8 @@ function SpaceCanvasBackground() {
       const parent = canvas.parentElement;
       canvas.width = parent.clientWidth;
       canvas.height = parent.clientHeight;
+      const w = window.innerWidth;
+      numParticles = w < 480 ? 38 : w < 768 ? 60 : w < 1100 ? 100 : 140;
       initParticles();
     };
 
@@ -579,7 +837,7 @@ function SectionParticles({ n = 65 }) {
 /**
  * Pure Mouse-tracking 3D Interactive Tilt Wrapper
  */
-function Tilt({ children, deg = 14 }) {
+function Tilt({ children, deg = 14, width = '100%' }) {
   const ref = useRef(null);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -607,7 +865,7 @@ function Tilt({ children, deg = 14 }) {
       ref={ref}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      style={{ perspective: '900px', width: '100%' }}
+      style={{ perspective: '900px', width }}
     >
       <motion.div style={{ rotateX, rotateY, transformStyle: 'preserve-3d' }}>
         {children}
@@ -640,6 +898,20 @@ function Reveal3D({ children, delay = 0 }) {
  * Polymorphic Button / Anchor Hybrid Component
  */
 function Btn({ children, primary = false, onClick, href }) {
+  const ref = useRef(null);
+  const mvx = useMotionValue(0);
+  const mvy = useMotionValue(0);
+  const x = useSpring(mvx, { stiffness: 300, damping: 18, mass: 0.4 });
+  const y = useSpring(mvy, { stiffness: 300, damping: 18, mass: 0.4 });
+
+  const handleMove = (e) => {
+    if (!ref.current) return;
+    const b = ref.current.getBoundingClientRect();
+    mvx.set((e.clientX - (b.left + b.width / 2)) * 0.35);
+    mvy.set((e.clientY - (b.top + b.height / 2)) * 0.35);
+  };
+  const handleLeave = () => { mvx.set(0); mvy.set(0); };
+
   const styles = {
     display: 'inline-flex',
     alignItems: 'center',
@@ -651,18 +923,22 @@ function Btn({ children, primary = false, onClick, href }) {
     fontFamily: "'Inter', sans-serif",
     cursor: 'pointer',
     textDecoration: 'none',
-    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
     border: primary ? 'none' : '1px solid var(--stroke)',
-    background: primary ? 'var(--G)' : 'transparent',
+    background: primary ? 'var(--G)' : 'rgba(255,255,255,0.02)',
+    backdropFilter: primary ? 'none' : 'blur(6px)',
     color: primary ? '#060608' : 'var(--txt)',
     boxShadow: primary ? '0 4px 20px rgba(126,184,247,0.25)' : 'none',
+    x, y
   };
 
   const elementProps = {
+    ref,
     style: styles,
-    onClick: onClick,
-    whileHover: { y: -2, boxShadow: primary ? '0 6px 26px rgba(126,184,247,0.45)' : '0 4px 14px rgba(255,255,255,0.05)' },
-    whileTap: { scale: 0.97 }
+    onClick,
+    onMouseMove: handleMove,
+    onMouseLeave: handleLeave,
+    whileHover: { scale: 1.05, boxShadow: primary ? '0 8px 30px rgba(126,184,247,0.5)' : '0 4px 18px rgba(126,184,247,0.18)' },
+    whileTap: { scale: 0.96 }
   };
 
   if (href) {
@@ -700,6 +976,120 @@ function SHead({ eyebrow, heading, italic, sub }) {
       {sub && (
         <p style={{ marginTop: '0.75rem', color: 'var(--muted)', fontSize: '0.95rem', maxWidth: '500px' }}>{sub}</p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Custom Interactive Cursor — a precise dot + lagging glow ring that
+ * expands when hovering interactive elements. Desktop / fine-pointer only.
+ */
+function CustomCursor() {
+  const dotX = useMotionValue(-100);
+  const dotY = useMotionValue(-100);
+  const ringX = useSpring(dotX, { stiffness: 380, damping: 30, mass: 0.4 });
+  const ringY = useSpring(dotY, { stiffness: 380, damping: 30, mass: 0.4 });
+  const [hovering, setHovering] = useState(false);
+  const [down, setDown] = useState(false);
+
+  useEffect(() => {
+    const targets = 'a, button, [role="button"], .skill-card, .pcard-inner, input, textarea';
+    const move = (e) => { dotX.set(e.clientX); dotY.set(e.clientY); };
+    const over = (e) => { if (e.target.closest && e.target.closest(targets)) setHovering(true); };
+    const out = (e) => { if (e.target.closest && e.target.closest(targets)) setHovering(false); };
+    const dn = () => setDown(true);
+    const up = () => setDown(false);
+
+    document.body.classList.add('cc-active');
+    window.addEventListener('mousemove', move, { passive: true });
+    document.addEventListener('mouseover', over, { passive: true });
+    document.addEventListener('mouseout', out, { passive: true });
+    window.addEventListener('mousedown', dn);
+    window.addEventListener('mouseup', up);
+    return () => {
+      document.body.classList.remove('cc-active');
+      window.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseover', over);
+      document.removeEventListener('mouseout', out);
+      window.removeEventListener('mousedown', dn);
+      window.removeEventListener('mouseup', up);
+    };
+  }, []);
+
+  return (
+    <>
+      {/* Precise core dot */}
+      <motion.div
+        className="cursor-dot"
+        style={{
+          position: 'fixed', top: 0, left: 0, x: dotX, y: dotY,
+          width: '7px', height: '7px', marginLeft: '-3.5px', marginTop: '-3.5px',
+          borderRadius: '50%', background: 'var(--a1)',
+          boxShadow: '0 0 10px rgba(126,184,247,0.9)',
+          zIndex: 10000, pointerEvents: 'none', mixBlendMode: 'difference'
+        }}
+        animate={{ scale: hovering ? 0 : down ? 0.6 : 1 }}
+        transition={{ duration: 0.18 }}
+      />
+      {/* Lagging glow ring */}
+      <motion.div
+        className="cursor-ring"
+        style={{
+          position: 'fixed', top: 0, left: 0, x: ringX, y: ringY,
+          width: '34px', height: '34px', marginLeft: '-17px', marginTop: '-17px',
+          borderRadius: '50%', border: '1.5px solid var(--a1)',
+          zIndex: 9999, pointerEvents: 'none'
+        }}
+        animate={{
+          scale: hovering ? 1.9 : down ? 0.85 : 1,
+          backgroundColor: hovering ? 'rgba(126,184,247,0.12)' : 'rgba(126,184,247,0)',
+          borderColor: hovering ? 'var(--a3)' : 'var(--a1)'
+        }}
+        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+      />
+    </>
+  );
+}
+
+/**
+ * Top scroll-progress bar driven by page scroll.
+ */
+function ScrollProgress() {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, { stiffness: 130, damping: 30, mass: 0.3 });
+  return (
+    <motion.div
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, height: '3px',
+        background: 'var(--G2)', backgroundSize: '200% auto',
+        transformOrigin: '0%', scaleX, zIndex: 250,
+        animation: 'shimmer 4s linear infinite',
+        boxShadow: '0 0 12px rgba(126,184,247,0.6)'
+      }}
+    />
+  );
+}
+
+/**
+ * Sitewide animated Aurora gradient mesh — rich, attractive ambient color
+ * that drifts slowly behind all content.
+ */
+function AuroraBackground() {
+  const blobs = [
+    { c: 'rgba(126,184,247,0.30)', size: '46vw', top: '-8%', left: '-6%', anim: 'aurora-a 22s ease-in-out infinite' },
+    { c: 'rgba(124,58,237,0.26)', size: '42vw', top: '20%', left: '58%', anim: 'aurora-b 26s ease-in-out infinite' },
+    { c: 'rgba(6,182,212,0.22)', size: '40vw', top: '55%', left: '4%', anim: 'aurora-c 30s ease-in-out infinite' },
+    { c: 'rgba(244,114,182,0.18)', size: '34vw', top: '68%', left: '62%', anim: 'aurora-d 24s ease-in-out infinite' }
+  ];
+  return (
+    <div aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: -1, overflow: 'hidden', pointerEvents: 'none' }}>
+      {blobs.map((b, i) => (
+        <div
+          key={i}
+          className="aurora-blob"
+          style={{ width: b.size, height: b.size, top: b.top, left: b.left, background: `radial-gradient(circle, ${b.c} 0%, rgba(0,0,0,0) 70%)`, animation: b.anim }}
+        />
+      ))}
     </div>
   );
 }
@@ -747,7 +1137,7 @@ function LoadingScreen({ onDone }) {
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        padding: '3rem',
+        padding: 'clamp(1.5rem, 5vw, 3rem)',
         overflow: 'hidden'
       }}
     >
@@ -799,6 +1189,7 @@ function LoadingScreen({ onDone }) {
 
 function Navbar({ theme, toggleTheme }) {
   const isScrolled = useScrolled(70);
+  const isMobile = useIsMobile(900);
 
   const scrollNav = (id) => {
     const el = document.getElementById(id);
@@ -806,21 +1197,19 @@ function Navbar({ theme, toggleTheme }) {
   };
 
   return (
-    <motion.div
-      initial={{ y: -44, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ delay: 0.15, duration: 0.5 }}
-      style={{
-        position: 'fixed',
-        top: '1.5rem',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 200,
-        width: '94%',
-        maxWidth: '820px'
-      }}
-    >
-      <div
+    <div style={{
+      position: 'fixed',
+      top: '1rem',
+      left: '50%',
+      transform: 'translateX(-50%)',   // CSS-only centering — NOT managed by framer
+      zIndex: 200,
+      width: 'min(94%, 820px)',
+      maxWidth: 'calc(100vw - 2rem)',
+    }}>
+      <motion.div
+        initial={{ y: -44, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.15, duration: 0.5 }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -832,70 +1221,43 @@ function Navbar({ theme, toggleTheme }) {
           background: 'var(--nav-bg)',
           border: '1px solid var(--nav-border)',
           boxShadow: isScrolled ? '0 8px 44px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.05)' : 'none',
-          transition: 'box-shadow 0.3s ease'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <Tilt deg={22}>
+          transition: 'box-shadow 0.3s ease',
+          gap: '0.5rem'
+        }}>
+        {/* LEFT: Logo + Desktop Nav */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, overflow: 'hidden' }}>
+          <Tilt deg={22} width="fit-content">
             <div
               onClick={() => scrollNav('hero')}
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, var(--a2), var(--a1))',
-                padding: '2px',
-                cursor: 'pointer',
-                boxShadow: '0 0 14px rgba(126,184,247,0.35)'
-              }}
+              style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--a2), var(--a1))', padding: '2px', cursor: 'pointer', boxShadow: '0 0 14px rgba(126,184,247,0.35)', flexShrink: 0 }}
             >
-              <div style={{
-                width: '100%',
-                height: '100%',
-                borderRadius: '50%',
-                overflow: 'hidden',
-                background: 'var(--bg)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <img
-                  src="/images/vecteezy_software-engineer-png-graphic-clipart-design_23485893.png"
-                  alt="Aakash Ijaz"
-                  style={{
-                    width: '130%',
-                    height: '130%',
-                    objectFit: 'contain',
-                    objectPosition: 'center 10%',
-                    marginTop: '8px'
-                  }}
-                />
+              <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img src="/images/vecteezy_software-engineer-png-graphic-clipart-design_23485893.png" alt="Aakash Ijaz" style={{ width: '130%', height: '130%', objectFit: 'contain', objectPosition: 'center 10%', marginTop: '8px' }} />
               </div>
             </div>
           </Tilt>
 
-          <nav style={{ display: 'flex', alignItems: 'center', gap: '0.1rem' }}>
+          {/* Desktop nav links — hidden on mobile */}
+          <nav className="desktop-nav" style={{ display: isMobile ? 'none' : 'flex', alignItems: 'center', gap: '0.1rem' }}>
             {['Home', 'About', 'Projects', 'Skills', 'Contact'].map((item) => (
-              <button
-                key={item}
-                onClick={() => scrollNav(item.toLowerCase())}
-                className="portfolio-nav-link"
-              >
+              <button key={item} onClick={() => scrollNav(item.toLowerCase())} className="portfolio-nav-link">
                 {item}
               </button>
             ))}
           </nav>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-          {/* Resume Button — opens in new tab, also downloadable */}
+        {/* RIGHT: Always rendered controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+          {/* Resume — desktop only */}
           <a
             href="/AakashIjaz_resume.pdf"
             target="_blank"
             rel="noopener noreferrer"
             download="AakashIjaz_resume.pdf"
-            className="portfolio-resume-btn"
+            className="portfolio-resume-btn desktop-resume-btn"
             title="View & Download Resume"
+            style={{ display: isMobile ? 'none' : 'inline-flex' }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -906,35 +1268,107 @@ function Navbar({ theme, toggleTheme }) {
             </svg>
             Resume
           </a>
+          <div className="desktop-divider" style={{ width: '1px', height: '18px', background: 'var(--stroke)', display: isMobile ? 'none' : 'block' }} />
 
-          <div style={{ width: '1px', height: '18px', background: 'var(--stroke)' }}></div>
-
+          {/* Theme toggle — always shown */}
           <motion.button
             onClick={toggleTheme}
             whileHover={{ scale: 1.1, rotate: 18 }}
             whileTap={{ scale: 0.9 }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '1.1rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--txt)',
-              padding: '0.4rem',
-              borderRadius: '50%',
-              transition: 'background 0.2s'
-            }}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--txt)', padding: '0.4rem', borderRadius: '50%' }}
             title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
             {theme === 'dark' ? '☀️' : '🌙'}
           </motion.button>
-          <div style={{ width: '1px', height: '18px', background: 'var(--stroke)' }}></div>
-          <Btn primary onClick={() => scrollNav('contact')}>Hire me</Btn>
+
+          {/* Hire me — desktop only */}
+          <div className="desktop-divider" style={{ width: '1px', height: '18px', background: 'var(--stroke)', display: isMobile ? 'none' : 'block' }} />
+          <span className="desktop-hire-btn" style={{ display: isMobile ? 'none' : 'inline-flex' }}>
+            <Btn primary onClick={() => scrollNav('contact')}>Hire me</Btn>
+          </span>
+
+          {/* Hamburger — mobile only, always in DOM */}
+          <NavbarMobile theme={theme} toggleTheme={toggleTheme} scrollNav={scrollNav} isMobile={isMobile} />
         </div>
+      </motion.div>
+    </div>
+  );
+}
+
+
+function NavbarMobile({ theme, toggleTheme, scrollNav, isMobile }) {
+  const [open, setOpen] = useState(false);
+  const handleNav = (id) => { setOpen(false); scrollNav(id); };
+
+  return (
+    <>
+      <button
+        className="hamburger-btn"
+        onClick={() => setOpen(o => !o)}
+        aria-label="Toggle menu"
+        style={{
+          background: 'transparent',
+          border: '1px solid var(--stroke)',
+          color: 'var(--txt)',
+          width: '38px',
+          height: '38px',
+          borderRadius: '10px',
+          cursor: 'pointer',
+          display: isMobile ? 'flex' : 'none',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '1.05rem',
+          flexShrink: 0,
+          fontFamily: 'sans-serif',
+          transition: 'border-color 0.2s'
+        }}
+      >
+        {open ? '✕' : '☰'}
+      </button>
+      <div
+        className={`mobile-drawer ${open ? 'open' : ''}`}
+        style={{ display: (isMobile && open) ? 'flex' : 'none' }}
+      >
+        {/* Drawer header with an explicit, always-visible close button */}
+        <div style={{ position: 'absolute', top: '1.1rem', left: '1.5rem', right: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '0.68rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: 'var(--muted)' }}>Menu</span>
+          <button
+            onClick={() => setOpen(false)}
+            aria-label="Close menu"
+            style={{
+              width: '42px', height: '42px', borderRadius: '12px',
+              border: '1px solid var(--stroke)', background: 'var(--surf)',
+              color: 'var(--txt)', fontSize: '1.25rem', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {['Home', 'About', 'Projects', 'Skills', 'Contact'].map((item) => (
+          <button key={item} className="mobile-drawer-link" onClick={() => handleNav(item.toLowerCase())}>
+            {item}
+          </button>
+        ))}
+        <div className="mobile-drawer-divider" />
+        <a
+          href="/AakashIjaz_resume.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          download="AakashIjaz_resume.pdf"
+          className="portfolio-resume-btn"
+          style={{ borderRadius: '0.75rem', justifyContent: 'center' }}
+          onClick={() => setOpen(false)}
+        >
+          📄 View Resume
+        </a>
+        <button onClick={() => { toggleTheme(); setOpen(false); }} className="mobile-drawer-link">
+          {theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}
+        </button>
+        <Btn primary onClick={() => handleNav('contact')}>Hire me</Btn>
       </div>
-    </motion.div>
+    </>
   );
 }
 
@@ -1005,52 +1439,52 @@ function Hero() {
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',      // top-align so tall content scrolls down, never under the navbar
         justifyContent: 'center',
         background: 'var(--bg)'
       }}
     >
-      {/* Layer 1: Enhanced 3D Particles Constellation Background */}
-      <SpaceCanvasBackground />
+      {/* Layer 1: Trionn-style interactive line field — touch & hold to blast */}
+      <InteractiveLines />
 
       {/* Layer 2: Mouse Parallax Elements */}
       <motion.div style={{ position: 'absolute', inset: 0, x: px, y: py, pointerEvents: 'none', zIndex: 2 }}>
         <div style={{ position: 'absolute', top: '32%', left: '50%', transform: 'translate(-50%, -50%)', width: '70vw', height: '40vw', background: 'radial-gradient(circle, rgba(126,184,247,0.1) 0%, rgba(0,0,0,0) 70%)', filter: 'blur(40px)' }} />
-        <div className="float-y" style={{ position: 'absolute', top: '15%', left: '15%', width: '550px', height: '550px', background: 'radial-gradient(circle, rgba(124,58,237,0.03) 0%, rgba(0,0,0,0) 60%)', animation: 'float-y 8s ease-in-out infinite' }} />
-        <div className="float-y" style={{ position: 'absolute', bottom: '10%', right: '10%', width: '380px', height: '380px', background: 'radial-gradient(circle, rgba(6,182,212,0.03) 0%, rgba(0,0,0,0) 60%)', animation: 'float-y 6s ease-in-out infinite 1s' }} />
+        <div className="float-y" style={{ position: 'absolute', top: '15%', left: '15%', width: 'min(550px, 60vw)', height: 'min(550px, 60vw)', background: 'radial-gradient(circle, rgba(124,58,237,0.03) 0%, rgba(0,0,0,0) 60%)', animation: 'float-y 8s ease-in-out infinite' }} />
+        <div className="float-y" style={{ position: 'absolute', bottom: '10%', right: '10%', width: 'min(380px, 40vw)', height: 'min(380px, 40vw)', background: 'radial-gradient(circle, rgba(6,182,212,0.03) 0%, rgba(0,0,0,0) 60%)', animation: 'float-y 6s ease-in-out infinite 1s' }} />
       </motion.div>
 
       {/* Layer 3: Blueprint grid is rendered by SpaceCanvasBackground canvas itself — no duplicate needed */}
 
-      {/* Layer 4: Organic Texture Film Grain */}
-      <div style={{ position: 'absolute', inset: '-200%', width: '400%', height: '400%', backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3联%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' /%3E%3C/svg%3E")`, animation: 'grain 6s steps(10) infinite', pointerEvents: 'none', zIndex: 3, opacity: 'var(--grain-opacity)' }} />
+      {/* Layer 4: Organic Texture Film Grain — contained within section */}
+      <div style={{ position: 'absolute', inset: 0, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' /%3E%3C/svg%3E")`, pointerEvents: 'none', zIndex: 3, opacity: 'var(--grain-opacity)' }} />
 
       {/* Layer 5: Visual Content Gradient Falloff Base */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '260px', background: 'linear-gradient(transparent, var(--bg))', zIndex: 4, pointerEvents: 'none' }} />
 
-      {/* Main Container Content */}
-      <div style={{ position: 'relative', zIndex: 10, maxWidth: '820px', width: '100%', padding: '7rem 1.5rem 2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* Main Container Content — pointer-transparent so the line field stays touchable */}
+      <div style={{ position: 'relative', zIndex: 10, maxWidth: '920px', width: '100%', padding: 'clamp(7rem, 13vh, 10rem) 1.25rem 3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
 
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6 }}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(126,184,247,0.09)', border: '1px solid rgba(126,184,247,0.2)', padding: '0.4rem 1rem', borderRadius: '99px', fontSize: '0.72rem', letterSpacing: '0.05em', color: 'var(--a3)', marginBottom: '2rem' }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(126,184,247,0.09)', border: '1px solid rgba(126,184,247,0.2)', padding: '0.4rem 1rem', borderRadius: '99px', fontSize: '0.72rem', letterSpacing: '0.05em', color: 'var(--a3)', marginBottom: '2rem', pointerEvents: 'auto' }}
         >
           <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10B981', display: 'inline-block', animation: 'pulse-dot 2s infinite' }}></span>
           ✦ Available for opportunities
         </motion.div>
 
-        <Tilt deg={6}>
+        <Tilt deg={5}>
           <motion.h1
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.1 }}
-            className="fd"
+            transition={{ duration: 0.85, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
             style={{
-              fontSize: 'clamp(4rem, 9vw, 9rem)',
-              fontWeight: '400',
-              lineHeight: '0.95',
+              fontSize: 'clamp(2.5rem, 7.5vw, 6.5rem)',
+              fontWeight: '800',
+              letterSpacing: '-0.04em',
+              lineHeight: '0.92',
               background: 'linear-gradient(to bottom, var(--hero-text, #ffffff) 0%, var(--hero-text-sub, rgba(255,255,255,0.55)) 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
@@ -1058,11 +1492,11 @@ function Hero() {
               marginBottom: '1.5rem'
             }}
           >
-            Aakash Ijaz
+            Aakash <span className="fd" style={{ fontWeight: '400' }}>Ijaz</span>
           </motion.h1>
         </Tilt>
 
-        <div style={{ fontSize: 'clamp(1.2rem, 3.5vw, 2.2rem)', fontWeight: '300', height: '3.5rem', marginBottom: '1.5rem', color: 'var(--txt)' }}>
+        <div className="hero-role" style={{ fontSize: 'clamp(1.2rem, 3.5vw, 2.2rem)', fontWeight: '300', height: '3.5rem', marginBottom: '1.5rem', color: 'var(--txt)' }}>
           A <AnimatePresence mode="wait">
             <motion.span
               key={roleIdx}
@@ -1082,7 +1516,7 @@ function Hero() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
-          style={{ color: 'var(--muted)', fontSize: '0.95rem', lineHeight: '1.6', maxWidth: '460px', marginBottom: '3rem' }}
+          style={{ color: 'var(--muted)', fontSize: '0.95rem', lineHeight: '1.6', maxWidth: '460px', marginBottom: '2.25rem' }}
         >
           Engineering comprehensive architectural ecosystems using modern tech stacks, incorporating real-time AI capabilities, machine learning pipelines, and high-fidelity user experiences.
         </motion.p>
@@ -1091,10 +1525,21 @@ function Hero() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          style={{ display: 'flex', gap: '1rem', marginBottom: '5rem' }}
+          className="hero-btns"
+          style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', pointerEvents: 'auto' }}
         >
           <Btn primary onClick={() => document.getElementById('projects').scrollIntoView({ behavior: 'smooth' })}>View Projects ↓</Btn>
           <Btn onClick={() => document.getElementById('contact').scrollIntoView({ behavior: 'smooth' })}>Get in Touch</Btn>
+        </motion.div>
+
+        {/* Trionn-style interaction hint */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.7 }}
+          transition={{ delay: 0.9, duration: 0.8 }}
+          style={{ fontSize: '0.68rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '2.5rem' }}
+        >
+          ✦ Touch the lines · click &amp; hold to blast
         </motion.div>
 
         {/* Metrics/Stats Cluster */}
@@ -1102,6 +1547,7 @@ function Hero() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
+          className="hero-stats"
           style={{
             width: '100%',
             borderTop: '1px solid var(--stroke)',
@@ -1125,7 +1571,7 @@ function Hero() {
         </motion.div>
 
         {/* Scroll Indicator Metric Line */}
-        <div style={{ marginTop: '5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+        <div className="hero-scroll" style={{ marginTop: '2.75rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
           <span style={{ fontSize: '0.65rem', letterSpacing: '0.3em', color: 'var(--muted)' }}>SCROLL</span>
           <div style={{ width: '1px', height: '44px', background: 'var(--stroke)', position: 'relative', overflow: 'hidden' }}>
             <motion.div
@@ -1138,6 +1584,47 @@ function Hero() {
 
       </div>
     </section >
+  );
+}
+
+/**
+ * Trionn-style credibility wall — minimal uppercase label + name pairs.
+ */
+function TrustStrip() {
+  const items = [
+    { k: 'Education', v: 'FAST-NUCES' },
+    { k: 'AI Research', v: 'AIMS Lab' },
+    { k: 'Industry', v: 'Codroon' },
+    { k: 'Leadership', v: 'NASCON' },
+    { k: 'Stack', v: 'MERN · AI' },
+  ];
+  return (
+    <section
+      style={{
+        borderTop: '1px solid var(--stroke)',
+        borderBottom: '1px solid var(--stroke)',
+        padding: 'clamp(1.5rem, 4vw, 2.25rem) 0',
+        background: 'rgba(126,184,247,0.015)',
+        position: 'relative',
+        zIndex: 5,
+      }}
+    >
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 1.5rem' }}>
+        <div style={{ textAlign: 'center', fontSize: '0.66rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '1.4rem' }}>
+          Trusted across study, research &amp; industry
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 'clamp(1.25rem, 5vw, 3.5rem)' }}>
+          {items.map((it, i) => (
+            <Reveal3D key={i} delay={i * 0.06}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
+                <span style={{ fontSize: '0.58rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--a1)' }}>{it.k}</span>
+                <span className="fd" style={{ fontSize: 'clamp(1.1rem, 3.2vw, 1.6rem)', color: 'var(--txt)', whiteSpace: 'nowrap' }}>{it.v}</span>
+              </div>
+            </Reveal3D>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1185,18 +1672,19 @@ function TimeCard({ icon, title, sub, period, type, accent }) {
 
 function About() {
   return (
-    <section id="about" style={{ padding: '7rem 0 5rem', position: 'relative' }}>
-      <div style={{ position: 'absolute', topLeft: 0, width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(126,184,247,0.04) 0%, rgba(0,0,0,0) 70%)', pointerEvents: 'none' }} />
+    <section id="about" style={{ padding: 'clamp(4rem, 10vw, 7rem) 0 clamp(3rem, 8vw, 5rem)', position: 'relative', overflow: 'hidden' }}>
+      {/* Decorative blob — clipped by overflow:hidden */}
+      <div style={{ position: 'absolute', top: 0, left: '-10%', width: 'min(500px, 80vw)', height: 'min(500px, 80vw)', background: 'radial-gradient(circle, rgba(126,184,247,0.04) 0%, rgba(0,0,0,0) 70%)', pointerEvents: 'none' }} />
 
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 1.5rem' }}>
         <SHead eyebrow="Introduction" heading="Behind the" italic="System" />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '4rem', alignItems: 'flex-start' }}>
+        <div className="about-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '4rem', alignItems: 'flex-start' }}>
 
           {/* Left Summary Identity Block */}
           <Reveal3D>
             <Tilt deg={8}>
-              <div style={{ background: 'var(--surf)', border: '1px solid var(--stroke)', padding: '2.5rem', borderRadius: '1.5rem', position: 'relative', overflow: 'hidden' }}>
+              <div className="about-card" style={{ background: 'var(--surf)', border: '1px solid var(--stroke)', padding: '2.5rem', borderRadius: '1.5rem', position: 'relative', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', top: 0, right: 0, width: '200px', height: '200px', background: 'radial-gradient(circle, rgba(126,184,247,0.05) 0%, rgba(0,0,0,0) 70%)', pointerEvents: 'none' }} />
 
                 <div style={{ position: 'relative', width: '120px', height: '120px', marginBottom: '1.75rem' }}>
@@ -1333,15 +1821,17 @@ function PCard({ p }) {
   };
 
   const isWide = p.col >= 10;
+  const isMobile = useIsMobile(768);
   const spotlightBg = useTransform([glowX, glowY], ([x, y]) => `radial-gradient(circle at ${x}% ${y}%, rgba(126,184,247,0.13) 0%, rgba(0,0,0,0) 65%)`);
 
   return (
-    <div style={{ gridColumn: `span ${p.col}`, width: '100%', perspective: '1000px' }}>
+    <div style={{ gridColumn: isMobile ? 'span 12' : `span ${p.col}`, width: '100%', perspective: '1000px' }}>
       <Reveal3D>
         <motion.div
           ref={cardRef}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
+          className="pcard-inner"
           style={{
             rotateX: rX,
             rotateY: rY,
@@ -1353,7 +1843,7 @@ function PCard({ p }) {
             position: 'relative',
             overflow: 'hidden',
             display: 'flex',
-            flexDirection: isWide ? 'row' : 'column',
+            flexDirection: (isWide && !isMobile) ? 'row' : 'column',
             justifyContent: 'space-between',
             gap: '2.5rem'
           }}
@@ -1374,7 +1864,7 @@ function PCard({ p }) {
           {/* Layer D: Static Pure Ambient Gloss Shimmer */}
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 40%)', pointerEvents: 'none' }} />
 
-          <div style={{ position: 'absolute', top: '2rem', right: '2rem', fontSize: '0.85rem', color: 'var(--muted)', fontFamily: 'monospace' }}>
+          <div className="pcard-id" style={{ position: 'absolute', top: '2rem', right: '2rem', fontSize: '0.85rem', color: 'var(--muted)', fontFamily: 'monospace' }}>
             {p.id}
           </div>
 
@@ -1385,7 +1875,7 @@ function PCard({ p }) {
               <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{p.year}</span>
             </div>
 
-            <h3 className="fd" style={{ fontSize: '2.5rem', fontWeight: '400', marginBottom: '0.25rem', lineHeight: '1.1' }}>{p.title}</h3>
+            <h3 className="fd pcard-title" style={{ fontSize: '2.5rem', fontWeight: '400', marginBottom: '0.25rem', lineHeight: '1.1' }}>{p.title}</h3>
             <h4 style={{ fontSize: '0.88rem', color: 'var(--a1)', marginBottom: '1.2rem', fontWeight: '500' }}>{p.sub}</h4>
             <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>{p.desc}</p>
 
@@ -1436,6 +1926,36 @@ function PCard({ p }) {
   );
 }
 
+/**
+ * Defers loading/mounting the heavy three.js carousel until the user
+ * scrolls near it — keeps first paint fast, especially on mobile.
+ */
+function Lazy3DProjects({ items }) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '400px 0px' });
+
+  const placeholder = (
+    <div style={{
+      height: 'clamp(360px, 56vh, 620px)', marginBottom: '3rem',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      gap: '0.6rem', color: 'var(--muted)', fontSize: '0.8rem', letterSpacing: '0.15em', textTransform: 'uppercase'
+    }}>
+      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--a1)', animation: 'pulse-dot 1.4s infinite' }} />
+      Rendering 3D showcase
+    </div>
+  );
+
+  return (
+    <div ref={ref}>
+      {inView ? (
+        <React.Suspense fallback={placeholder}>
+          <Projects3D items={items} />
+        </React.Suspense>
+      ) : placeholder}
+    </div>
+  );
+}
+
 function Projects() {
   const dataset = [
     { id: "01", title: "Tahqiiq", sub: "AI Legal Document Analyzer", type: "Final Year Project", year: "2026", col: 7, desc: "Architected a distributed intelligent validation layer dedicated to corporate legal analysis, parsing structural vulnerabilities, and cross-checking ambiguity vectors.", bullets: ["Built custom risk extraction engines", "Integrated contextual embedding pipelines", "Optimized zero-latency client data parsing"], tags: ["React", "FastAPI", "NLP", "LangChain", "MERN"], accent: "#7EB8F7" },
@@ -1446,11 +1966,14 @@ function Projects() {
   ];
 
   return (
-    <section id="projects" style={{ padding: '6rem 0' }}>
+    <section id="projects" style={{ padding: '6rem 0', overflow: 'hidden' }}>
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 1.5rem' }}>
         <SHead eyebrow="Selected Works" heading="Architected" italic="Systems" />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '1.5rem', width: '100%' }}>
+        {/* Cinematic interactive 3D glass carousel (lazy-loaded) */}
+        <Lazy3DProjects items={dataset} />
+
+        <div className="projects-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '1.5rem', width: '100%' }}>
           {dataset.map((p) => <PCard key={p.id} p={p} />)}
         </div>
       </div>
@@ -1548,15 +2071,15 @@ function Skills() {
   ];
 
   return (
-    <section id="skills" style={{ padding: '6rem 0', position: 'relative' }}>
-      {/* Ambient background glows */}
-      <div style={{ position: 'absolute', top: '20%', left: '-10%', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(126,184,247,0.04) 0%, rgba(0,0,0,0) 70%)', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', bottom: '10%', right: '-5%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(167,139,250,0.04) 0%, rgba(0,0,0,0) 70%)', pointerEvents: 'none' }} />
+    <section id="skills" style={{ padding: '6rem 0', position: 'relative', overflow: 'hidden' }}>
+      {/* Ambient background glows — clipped by overflow:hidden */}
+      <div style={{ position: 'absolute', top: '20%', left: '-10%', width: 'min(500px, 70vw)', height: 'min(500px, 70vw)', background: 'radial-gradient(circle, rgba(126,184,247,0.04) 0%, rgba(0,0,0,0) 70%)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '10%', right: '-5%', width: 'min(400px, 60vw)', height: 'min(400px, 60vw)', background: 'radial-gradient(circle, rgba(167,139,250,0.04) 0%, rgba(0,0,0,0) 70%)', pointerEvents: 'none' }} />
 
       <div style={{ maxWidth: '1140px', margin: '0 auto', padding: '0 1.5rem' }}>
         <SHead eyebrow="Capabilities" heading="Technical" italic="Index" />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '1.5rem' }}>
           {schema.map((block, i) => (
             <Reveal3D key={i} delay={i * 0.07}>
               <Tilt deg={8}>
@@ -1819,6 +2342,189 @@ function ContactForm() {
   );
 }
 
+/**
+ * Trionn-style interactive line field. A grid of short line segments that
+ * gently flow at rest and radiate away from the cursor on contact. Click &
+ * hold sends an expanding "blast" ripple through the grid. Pure canvas, no n².
+ */
+function InteractiveLines() {
+  const canvasRef = useRef(null);
+  const mouse = useRef({ x: -9999, y: -9999 });
+  const blast = useRef({ active: false, r: 0, x: 0, y: 0 });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let raf, w, h, spacing, points = [];
+
+    const readAccent = () => {
+      const v = getComputedStyle(document.documentElement).getPropertyValue('--a1').trim();
+      return v || '#7EB8F7';
+    };
+    let accent = readAccent();
+
+    const build = () => {
+      const parent = canvas.parentElement;
+      w = canvas.width = parent.clientWidth;
+      h = canvas.height = parent.clientHeight;
+      spacing = w < 600 ? 32 : 46;
+      const cols = Math.ceil(w / spacing) + 1;
+      const rows = Math.ceil(h / spacing) + 1;
+      points = [];
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          points.push({ x: x * spacing, y: y * spacing, angle: 0, len: spacing * 0.3, cur: 0 });
+        }
+      }
+      accent = readAccent();
+    };
+    build();
+
+    // Convert "#rrggbb" -> "r,g,b"
+    const rgb = (() => {
+      const hex = accent.replace('#', '');
+      const n = parseInt(hex.length === 3 ? hex.replace(/(.)/g, '$1$1') : hex, 16);
+      return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+    })();
+
+    const radius = 175;
+    const render = (t) => {
+      ctx.clearRect(0, 0, w, h);
+      if (blast.current.active) {
+        blast.current.r += 16;
+        if (blast.current.r > Math.hypot(w, h)) blast.current.active = false;
+      }
+      const mx = mouse.current.x, my = mouse.current.y;
+
+      for (const p of points) {
+        const dx = p.x - mx, dy = p.y - my;
+        const dist = Math.hypot(dx, dy);
+
+        // Resting state: a slow flowing wave.
+        let tAngle = Math.sin((p.x + p.y) * 0.004 + t * 0.0004) * 0.6;
+        let tLen = spacing * 0.3;
+        let tCur = 0;
+
+        // Cursor repulsion -> radiate away.
+        if (dist < radius) {
+          const f = 1 - dist / radius;
+          tAngle = Math.atan2(dy, dx);
+          tLen = spacing * (0.3 + f * 0.55);
+          tCur = f;
+        }
+
+        // Blast ripple ring.
+        if (blast.current.active) {
+          const bd = Math.abs(Math.hypot(p.x - blast.current.x, p.y - blast.current.y) - blast.current.r);
+          if (bd < 64) {
+            const bf = 1 - bd / 64;
+            tAngle = Math.atan2(p.y - blast.current.y, p.x - blast.current.x);
+            tLen = spacing * (0.3 + bf * 0.8);
+            tCur = Math.max(tCur, bf);
+          }
+        }
+
+        p.angle += (tAngle - p.angle) * 0.18;
+        p.len += (tLen - p.len) * 0.12;
+        p.cur += (tCur - p.cur) * 0.12;
+
+        const hl = p.len / 2;
+        const ca = Math.cos(p.angle) * hl, sa = Math.sin(p.angle) * hl;
+        ctx.strokeStyle = `rgba(${rgb}, ${0.1 + p.cur * 0.7})`;
+        ctx.lineWidth = 0.8 + p.cur * 1.5;
+        ctx.beginPath();
+        ctx.moveTo(p.x - ca, p.y - sa);
+        ctx.lineTo(p.x + ca, p.y + sa);
+        ctx.stroke();
+
+        if (p.cur > 0.4) {
+          ctx.fillStyle = `rgba(${rgb}, ${(p.cur - 0.4) * 0.95})`;
+          ctx.beginPath();
+          ctx.arc(p.x + ca, p.y + sa, 1.1 + p.cur * 1.8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      raf = requestAnimationFrame(render);
+    };
+    raf = requestAnimationFrame(render);
+
+    const onMove = (e) => {
+      const r = canvas.getBoundingClientRect();
+      mouse.current.x = e.clientX - r.left;
+      mouse.current.y = e.clientY - r.top;
+    };
+    const onLeave = () => { mouse.current.x = -9999; mouse.current.y = -9999; };
+    const onDown = (e) => {
+      const r = canvas.getBoundingClientRect();
+      blast.current = { active: true, r: 0, x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+
+    canvas.addEventListener('pointermove', onMove, { passive: true });
+    canvas.addEventListener('pointerleave', onLeave);
+    canvas.addEventListener('pointerdown', onDown);
+    window.addEventListener('resize', build);
+    return () => {
+      cancelAnimationFrame(raf);
+      canvas.removeEventListener('pointermove', onMove);
+      canvas.removeEventListener('pointerleave', onLeave);
+      canvas.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('resize', build);
+    };
+  }, []);
+
+  // touchAction 'pan-y' keeps vertical page-scroll working on mobile while
+  // still letting taps/horizontal moves drive the line interaction & blast.
+  return <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', touchAction: 'pan-y' }} />;
+}
+
+/**
+ * Bold, trionn-inspired interactive typographic band.
+ */
+function InteractiveBand() {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true });
+
+  return (
+    <section style={{ position: 'relative', padding: 'clamp(5rem, 13vw, 9rem) 0', overflow: 'hidden' }}>
+      <InteractiveLines />
+
+      {/* edge fades for depth */}
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, transparent 35%, var(--bg) 92%)', pointerEvents: 'none', zIndex: 1 }} />
+
+      <div ref={ref} style={{ position: 'relative', zIndex: 2, maxWidth: '1000px', margin: '0 auto', padding: '0 1.5rem', textAlign: 'center', pointerEvents: 'none' }}>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6 }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.72rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: 'var(--a1)', marginBottom: '1.5rem' }}
+        >
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--a1)', animation: 'pulse-dot 2s infinite' }} />
+          Interactive · Dare to touch
+        </motion.div>
+
+        <motion.h2
+          initial={{ opacity: 0, y: 36, filter: 'blur(8px)' }}
+          animate={isInView ? { opacity: 1, y: 0, filter: 'blur(0px)' } : {}}
+          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+          style={{ fontSize: 'clamp(2.4rem, 8vw, 6rem)', fontWeight: '700', lineHeight: '1.02', letterSpacing: '-0.02em' }}
+        >
+          Designed to <span className="fd g-text" style={{ fontWeight: '400' }}>mean something.</span>
+        </motion.h2>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={isInView ? { opacity: 1 } : {}}
+          transition={{ delay: 0.4, duration: 0.8 }}
+          style={{ marginTop: '1.5rem', color: 'var(--muted)', fontSize: '0.95rem', letterSpacing: '0.02em' }}
+        >
+          Move across the field — <span style={{ color: 'var(--txt)' }}>click &amp; hold to blast the grid.</span>
+        </motion.p>
+      </div>
+    </section>
+  );
+}
+
 function Contact() {
   const containerRef = useRef(null);
 
@@ -1835,7 +2541,7 @@ function Contact() {
       {/* Single Marquee Banner — Row 1 only */}
       <div style={{ width: '100%', overflow: 'hidden', position: 'relative', marginBottom: '5rem' }}>
         <div style={{ borderTop: '1px solid var(--stroke)', borderBottom: '1px solid var(--stroke)', padding: '1.1rem 0', background: 'rgba(6,6,8,0.5)', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', width: '200%', animation: 'mq 28s linear infinite' }}>
+          <div className="contact-marquee" style={{ display: 'flex', width: '200%', animation: 'mq 28s linear infinite' }}>
             {[1, 2].map(k => (
               <div key={k} style={{ display: 'flex', width: '100%', whiteSpace: 'nowrap', gap: '3rem', alignItems: 'center' }}>
                 {["LET'S BUILD SOMETHING GREAT ✦", 'FULL·STACK · AI · ENGINEER ✦', 'OPEN TO WORK · ISLAMABAD · PK ✦', 'REACT · NODE · PYTHON · PYTORCH ✦', "LET'S BUILD SOMETHING GREAT ✦", 'MERN STACK · FAST API · ML ✦'].map((t, i) => (
@@ -1856,7 +2562,7 @@ function Contact() {
         </Tilt>
 
         {/* Contact Links Grid Layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.2rem', width: '100%', maxWidth: '960px', marginBottom: '4rem' }}>
+        <div className="contact-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '1.2rem', width: '100%', maxWidth: '960px', marginBottom: '4rem' }}>
           {[
             { tag: "EMAIL", val: "aakashijaz2002@gmail.com", url: "mailto:aakashijaz2002@gmail.com", emo: "✉️" },
             { tag: "PHONE", val: "+92 300 5413866", url: "tel:+923005413866", emo: "📞" },
@@ -1911,7 +2617,7 @@ function Contact() {
         </div>
 
         {/* Footer Real-Time Ledger Base Bar */}
-        <div style={{ width: '100%', borderTop: '1px solid var(--stroke)', marginTop: '6rem', paddingTop: '2rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1.5rem', fontSize: '0.82rem', color: 'var(--muted)' }}>
+        <div style={{ width: '100%', borderTop: '1px solid var(--stroke)', marginTop: '6rem', paddingTop: '2rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '1.5rem', fontSize: '0.82rem', color: 'var(--muted)', textAlign: 'center' }}>
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             <a href="https://linkedin.com" style={{ color: 'inherit', textDecoration: 'none' }}>LinkedIn</a>
             <a href="https://github.com" style={{ color: 'inherit', textDecoration: 'none' }}>GitHub</a>
@@ -1962,11 +2668,16 @@ export default function App() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6 }}
         >
+          <AuroraBackground />
+          <ScrollProgress />
+          <CustomCursor />
           <Navbar theme={theme} toggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')} />
           <Hero />
+          <TrustStrip />
           <About />
           <Projects />
           <Skills />
+          <InteractiveBand />
           <Contact />
           <ScrollToTop />
         </motion.div>
