@@ -17,6 +17,24 @@ import { Environment, Lightformer } from '@react-three/drei';
 const SPACING = 2.45;
 const lerp = THREE.MathUtils.lerp;
 
+/** "#rrggbb" + alpha → rgba() string for the label canvas. */
+function hexA(hex, a) {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.replace(/(.)/g, '$1$1') : h, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+/** Rounded-rect path helper (canvas roundRect isn't everywhere). */
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
 /** Word-wrap helper for the 2D label canvas. */
 function wrapText(ctx, text, x, y, maxW, lineHeight) {
   const words = String(text).split(' ');
@@ -46,32 +64,72 @@ function makeLabelTexture({ number, title, sub, type, accent }) {
   const ctx = c.getContext('2d');
   ctx.clearRect(0, 0, W, H);
 
+  // Deep panel wash so text always reads against the glass
+  const wash = ctx.createLinearGradient(0, 0, W, H);
+  wash.addColorStop(0, 'rgba(6,8,16,0.88)');
+  wash.addColorStop(0.55, 'rgba(10,12,24,0.72)');
+  wash.addColorStop(1, 'rgba(6,8,16,0.9)');
+  ctx.fillStyle = wash;
+  roundRect(ctx, 14, 14, W - 28, H - 28, 26);
+  ctx.fill();
+
+  // Accent aura in the top corner
+  const aura = ctx.createRadialGradient(W - 80, 90, 10, W - 80, 90, 320);
+  aura.addColorStop(0, hexA(accent, 0.4));
+  aura.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = aura;
+  ctx.fillRect(0, 0, W, H);
+
+  // Card frame stroke
+  ctx.strokeStyle = hexA(accent, 0.55);
+  ctx.lineWidth = 2.5;
+  roundRect(ctx, 14, 14, W - 28, H - 28, 26);
+  ctx.stroke();
+
   // Index number (top)
   ctx.fillStyle = accent;
-  ctx.font = '700 40px Inter, system-ui, sans-serif';
-  ctx.fillText(number, 46, 84);
-  ctx.fillRect(46, 102, 66, 4);
+  ctx.font = '700 44px Inter, system-ui, sans-serif';
+  ctx.fillText(number, 48, 96);
+  ctx.fillRect(48, 114, 66, 4);
 
-  // Type tag (top-right)
-  ctx.font = '600 22px Inter, system-ui, sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  const tw = ctx.measureText(type.toUpperCase()).width;
-  ctx.fillText(type.toUpperCase(), W - 46 - tw, 80);
+  // Type tag pill (top-right)
+  ctx.font = '600 20px Inter, system-ui, sans-serif';
+  const typeTxt = type.toUpperCase();
+  const tw = ctx.measureText(typeTxt).width;
+  ctx.fillStyle = hexA(accent, 0.16);
+  roundRect(ctx, W - 66 - tw, 58, tw + 36, 42, 21);
+  ctx.fill();
+  ctx.strokeStyle = hexA(accent, 0.5);
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, W - 66 - tw, 58, tw + 36, 42, 21);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText(typeTxt, W - 48 - tw, 87);
 
   // Title (serif italic, wrapped)
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'italic 600 70px Georgia, "Times New Roman", serif';
-  const endY = wrapText(ctx, title, 46, 540, W - 92, 72);
+  ctx.shadowColor = 'rgba(0,0,0,0.55)';
+  ctx.shadowBlur = 18;
+  ctx.font = 'italic 600 68px Georgia, "Times New Roman", serif';
+  const endY = wrapText(ctx, title, 48, 520, W - 96, 72);
+  ctx.shadowBlur = 0;
+
+  // Divider
+  const div = ctx.createLinearGradient(48, 0, W - 48, 0);
+  div.addColorStop(0, hexA(accent, 0.8));
+  div.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = div;
+  ctx.fillRect(48, endY + 26, W - 160, 2);
 
   // Subtitle
-  ctx.fillStyle = 'rgba(255,255,255,0.80)';
-  ctx.font = '400 28px Inter, system-ui, sans-serif';
-  wrapText(ctx, sub, 46, endY + 56, W - 92, 36);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = '400 27px Inter, system-ui, sans-serif';
+  wrapText(ctx, sub, 48, endY + 68, W - 96, 36);
 
   // CTA
   ctx.fillStyle = accent;
   ctx.font = '700 24px Inter, system-ui, sans-serif';
-  ctx.fillText('VIEW CASE  →', 46, H - 60);
+  ctx.fillText('VIEW CASE  →', 48, H - 58);
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -163,9 +221,9 @@ function GlassCard({ index, count, data, drag }) {
       glassRef.current.iridescence = lerp(glassRef.current.iridescence, 0.18 + hoverVal.current * 0.82, 0.1);
       glassRef.current.clearcoat = lerp(glassRef.current.clearcoat, 0.35 + hoverVal.current * 0.65, 0.1);
     }
-    // Reveal the title on hover.
+    // Labels always readable; hover pushes them to full strength.
     if (labelRef.current) {
-      labelRef.current.opacity = lerp(labelRef.current.opacity, 0.1 + hoverVal.current * 0.9, 0.12);
+      labelRef.current.opacity = lerp(labelRef.current.opacity, 0.62 + hoverVal.current * 0.38, 0.12);
     }
   });
 
@@ -227,7 +285,22 @@ function Carousel({ items, onGrab }) {
       onGrab && onGrab(false);
     };
     window.addEventListener('pointerup', end);
-    return () => window.removeEventListener('pointerup', end);
+
+    // Page scroll spins the ring — new cards rotate in as you scroll past.
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const dy = window.scrollY - lastY;
+      lastY = window.scrollY;
+      if (!drag.current.dragging) {
+        const v = drag.current.velocity + dy * 0.00006;
+        drag.current.velocity = Math.max(-0.09, Math.min(0.09, v));
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('scroll', onScroll);
+    };
   }, [onGrab]);
 
   useFrame(() => {
@@ -333,7 +406,7 @@ export default function Projects3D({ items }) {
           opacity: 0.8,
         }}
       >
-        <span style={{ fontSize: '0.9rem' }}>⟵</span> Drag · Hover to reveal <span style={{ fontSize: '0.9rem' }}>⟶</span>
+        <span style={{ fontSize: '0.9rem' }}>⟵</span> Drag · Scroll to spin · Hover to focus <span style={{ fontSize: '0.9rem' }}>⟶</span>
       </div>
     </div>
   );

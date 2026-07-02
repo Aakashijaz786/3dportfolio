@@ -5,13 +5,17 @@ import {
   useMotionValue,
   useSpring,
   useTransform,
+  useMotionTemplate,
   useInView,
   useScroll
 } from 'framer-motion';
 import { useForm, ValidationError } from '@formspree/react';
+import { SmoothScroll, SplitReveal, ScrubText, ScrubIn, VelocityMarquee, ParallaxY, Magnetic, GhostTitle, ScrubZoom, CountUp, ShatterText, SoundLines, usePinProgress, scrollToId, scrollToTop } from './fx';
 
 // Heavy three.js showcase is code-split + mounted only when scrolled near.
 const Projects3D = React.lazy(() => import('./Projects3D'));
+// Scroll-reactive glass 3D hero object — code-split, desktop-only.
+const HeroScene = React.lazy(() => import('./HeroScene'));
 
 // ==========================================
 // 1. DYNAMIC GLOBAL STYLES INJECTION
@@ -70,6 +74,12 @@ if (typeof window !== 'undefined') {
       max-width: 100vw;
     }
 
+    /* ── LENIS SMOOTH SCROLL ── */
+    html.lenis, html.lenis body { height: auto; }
+    .lenis.lenis-smooth { scroll-behavior: auto !important; }
+    .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+    .lenis.lenis-stopped { overflow: hidden; }
+
     body, header, nav, div, section, button, a, span, h1, h2, h3, h4, h5, h6, p, ul, li {
       transition: background-color 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), 
                   color 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), 
@@ -81,13 +91,15 @@ if (typeof window !== 'undefined') {
       background-color: var(--bg);
       color: var(--txt);
       font-family: 'Inter', sans-serif;
-      overflow-x: hidden;
+      /* clip (not hidden): hidden creates a scroll container and breaks
+         position:sticky pinned sections */
+      overflow-x: clip;
       max-width: 100vw;
       -webkit-font-smoothing: antialiased;
     }
 
     #root {
-      overflow-x: hidden;
+      overflow-x: clip;
       max-width: 100vw;
     }
 
@@ -182,6 +194,29 @@ if (typeof window !== 'undefined') {
       -webkit-text-fill-color: transparent;
     }
 
+    /* Huge hollow display type for marquee dividers / ghost layers */
+    .outline-text {
+      color: transparent;
+      -webkit-text-stroke: 1.5px var(--muted);
+      opacity: 0.45;
+      font-weight: 700;
+      font-family: 'Familjen Grotesk', 'Inter', sans-serif;
+    }
+
+    /* Sitewide animated film-grain overlay (trionn-style). Oversized so the
+       stepped translate never exposes edges; compositor-only animation. */
+    .noise-overlay {
+      position: fixed;
+      inset: -10%;
+      width: 120%;
+      height: 120%;
+      z-index: 9990;
+      pointer-events: none;
+      opacity: var(--grain-opacity);
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' /%3E%3C/svg%3E");
+      animation: grain 0.7s steps(8) infinite;
+    }
+
     /* Keyframe Animations */
     @keyframes shimmer {
       0% { background-position: 0% center; }
@@ -225,7 +260,7 @@ if (typeof window !== 'undefined') {
     }
 
     /* Google Fonts Dynamic Injection */
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@1&family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@1&family=Inter:wght@300;400;500;600;700&family=Familjen+Grotesk:wght@400;500;600;700&display=swap');
 
     /* ── NAV LINK HOVER EFFECT ── */
     .portfolio-nav-link {
@@ -956,26 +991,26 @@ function SHead({ eyebrow, heading, italic, sub }) {
 
   return (
     <div ref={ref} style={{ marginBottom: '3.5rem', width: '100%' }}>
-      <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={isInView ? { opacity: 1, x: 0 } : {}}
-        transition={{ duration: 0.6 }}
-        style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.2em', color: 'var(--a1)', marginBottom: '0.5rem' }}
-      >
-        <span style={{ width: '24px', height: '1px', background: 'var(--a1)' }}></span>
-        {eyebrow}
-      </motion.div>
-      <motion.h2
-        initial={{ opacity: 0, y: 30, filter: 'blur(4px)' }}
-        animate={isInView ? { opacity: 1, y: 0, filter: 'blur(0px)' } : {}}
-        transition={{ duration: 0.8, delay: 0.1 }}
-        style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)', fontWeight: '400', lineHeight: '1.1' }}
-      >
-        {heading} <span className="fd g-text">{italic}</span>
-      </motion.h2>
-      {sub && (
-        <p style={{ marginTop: '0.75rem', color: 'var(--muted)', fontSize: '0.95rem', maxWidth: '500px' }}>{sub}</p>
-      )}
+      <ParallaxY from={26} to={-26}>
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={isInView ? { opacity: 1, x: 0 } : {}}
+          transition={{ duration: 0.6 }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.2em', color: 'var(--a1)', marginBottom: '0.5rem' }}
+        >
+          <span style={{ width: '24px', height: '1px', background: 'var(--a1)' }}></span>
+          {eyebrow}
+        </motion.div>
+        <h2 style={{ fontSize: 'clamp(2rem, 5vw, 3.5rem)', fontWeight: '400', lineHeight: '1.1' }}>
+          <SplitReveal text={heading} per="word" delay={0.05} />{' '}
+          <span className="fd g-text">
+            <SplitReveal text={italic} per="word" delay={0.25} />
+          </span>
+        </h2>
+        {sub && (
+          <p style={{ marginTop: '0.75rem', color: 'var(--muted)', fontSize: '0.95rem', maxWidth: '500px' }}>{sub}</p>
+        )}
+      </ParallaxY>
     </div>
   );
 }
@@ -1191,10 +1226,7 @@ function Navbar({ theme, toggleTheme }) {
   const isScrolled = useScrolled(70);
   const isMobile = useIsMobile(900);
 
-  const scrollNav = (id) => {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollNav = (id) => scrollToId(id);
 
   return (
     <div style={{
@@ -1284,7 +1316,9 @@ function Navbar({ theme, toggleTheme }) {
           {/* Hire me — desktop only */}
           <div className="desktop-divider" style={{ width: '1px', height: '18px', background: 'var(--stroke)', display: isMobile ? 'none' : 'block' }} />
           <span className="desktop-hire-btn" style={{ display: isMobile ? 'none' : 'inline-flex' }}>
-            <Btn primary onClick={() => scrollNav('contact')}>Hire me</Btn>
+            <Magnetic strength={0.3}>
+              <Btn primary onClick={() => scrollNav('contact')}>Hire me</Btn>
+            </Magnetic>
           </span>
 
           {/* Hamburger — mobile only, always in DOM */}
@@ -1389,7 +1423,7 @@ function ScrollToTop() {
       {visible && (
         <motion.button
           className="scroll-top-fab"
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          onClick={() => scrollToTop()}
           initial={{ opacity: 0, scale: 0.6, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.6, y: 20 }}
@@ -1409,12 +1443,19 @@ function Hero() {
   const containerRef = useRef(null);
   const roles = ["Software Engineer", "Full-Stack Developer", "ML Engineer", "AI Builder"];
   const [roleIdx, setRoleIdx] = useState(0);
+  const isMobile = useIsMobile(900);
 
   // Parallax Mechanics
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
   const px = useSpring(useTransform(mx, [-0.5, 0.5], [-25, 25]), { stiffness: 40, damping: 15 });
   const py = useSpring(useTransform(my, [-0.5, 0.5], [-25, 25]), { stiffness: 40, damping: 15 });
+
+  // Scroll-exit scrub: hero content drifts up, shrinks and fades as you leave
+  const { scrollYProgress: exitProg } = useScroll({ target: containerRef, offset: ['start start', 'end start'] });
+  const exitY = useTransform(exitProg, [0, 1], [0, -150]);
+  const exitScale = useTransform(exitProg, [0, 1], [1, 0.93]);
+  const exitOpacity = useTransform(exitProg, [0, 0.75], [1, 0]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1447,6 +1488,15 @@ function Hero() {
       {/* Layer 1: Trionn-style interactive line field — touch & hold to blast */}
       <InteractiveLines />
 
+      {/* Layer 1.5: Scroll-reactive iridescent glass 3D object (desktop only) */}
+      {!isMobile && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none', opacity: 0.55 }}>
+          <React.Suspense fallback={null}>
+            <HeroScene />
+          </React.Suspense>
+        </div>
+      )}
+
       {/* Layer 2: Mouse Parallax Elements */}
       <motion.div style={{ position: 'absolute', inset: 0, x: px, y: py, pointerEvents: 'none', zIndex: 2 }}>
         <div style={{ position: 'absolute', top: '32%', left: '50%', transform: 'translate(-50%, -50%)', width: '70vw', height: '40vw', background: 'radial-gradient(circle, rgba(126,184,247,0.1) 0%, rgba(0,0,0,0) 70%)', filter: 'blur(40px)' }} />
@@ -1462,8 +1512,9 @@ function Hero() {
       {/* Layer 5: Visual Content Gradient Falloff Base */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '260px', background: 'linear-gradient(transparent, var(--bg))', zIndex: 4, pointerEvents: 'none' }} />
 
-      {/* Main Container Content — pointer-transparent so the line field stays touchable */}
-      <div style={{ position: 'relative', zIndex: 10, maxWidth: '920px', width: '100%', padding: 'clamp(7rem, 13vh, 10rem) 1.25rem 3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
+      {/* Main Container Content — pointer-transparent so the line field stays touchable.
+          Scrubbed by scroll for a cinematic exit as the user leaves the hero. */}
+      <motion.div style={{ position: 'relative', zIndex: 10, maxWidth: '920px', width: '100%', padding: 'clamp(7rem, 13vh, 10rem) 1.25rem 3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none', y: exitY, scale: exitScale, opacity: exitOpacity, willChange: 'transform, opacity' }}>
 
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
@@ -1476,38 +1527,40 @@ function Hero() {
         </motion.div>
 
         <Tilt deg={5}>
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.85, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+          <h1
             style={{
               fontSize: 'clamp(2.5rem, 7.5vw, 6.5rem)',
               fontWeight: '800',
               letterSpacing: '-0.04em',
-              lineHeight: '0.92',
-              background: 'linear-gradient(to bottom, var(--hero-text, #ffffff) 0%, var(--hero-text-sub, rgba(255,255,255,0.55)) 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
+              lineHeight: '0.98',
+              /* solid color — background-clip:text breaks on transformed split chars */
+              color: 'var(--hero-text)',
+              textShadow: '0 8px 40px rgba(0,0,0,0.35)',
               marginBottom: '1.5rem'
             }}
           >
-            Aakash <span className="fd" style={{ fontWeight: '400' }}>Ijaz</span>
-          </motion.h1>
+            <SplitReveal text="Aakash" per="char" delay={0.15} duration={1} />{' '}
+            <span className="fd" style={{ fontWeight: '400' }}>
+              <SplitReveal text="Ijaz" per="char" delay={0.42} duration={1} />
+            </span>
+          </h1>
         </Tilt>
 
         <div className="hero-role" style={{ fontSize: 'clamp(1.2rem, 3.5vw, 2.2rem)', fontWeight: '300', height: '3.5rem', marginBottom: '1.5rem', color: 'var(--txt)' }}>
           A <AnimatePresence mode="wait">
-            <motion.span
-              key={roleIdx}
-              initial={{ opacity: 0, y: 10, filter: 'blur(6px)' }}
-              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, y: -10, filter: 'blur(6px)' }}
-              transition={{ duration: 0.4 }}
-              className="fd sh-text"
-              style={{ fontWeight: '400' }}
-            >
-              {roles[roleIdx]}
+            <motion.span key={roleIdx} className="fd sh-text" style={{ fontWeight: '400', display: 'inline-block' }}>
+              {/* Trionn-style word morph: chars fly out up / in from below */}
+              {roles[roleIdx].split('').map((c, i) => (
+                <motion.span
+                  key={i}
+                  initial={{ opacity: 0, y: 16, rotate: 8 }}
+                  animate={{ opacity: 1, y: 0, rotate: 0, transition: { delay: i * 0.028, duration: 0.4, ease: [0.22, 1, 0.36, 1] } }}
+                  exit={{ opacity: 0, y: -14, rotate: -6, transition: { delay: i * 0.014, duration: 0.25 } }}
+                  style={{ display: 'inline-block', whiteSpace: 'pre' }}
+                >
+                  {c}
+                </motion.span>
+              ))}
             </motion.span>
           </AnimatePresence> based in Islamabad, PK.
         </div>
@@ -1528,8 +1581,8 @@ function Hero() {
           className="hero-btns"
           style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', pointerEvents: 'auto' }}
         >
-          <Btn primary onClick={() => document.getElementById('projects').scrollIntoView({ behavior: 'smooth' })}>View Projects ↓</Btn>
-          <Btn onClick={() => document.getElementById('contact').scrollIntoView({ behavior: 'smooth' })}>Get in Touch</Btn>
+          <Btn primary onClick={() => scrollToId('projects')}>View Projects ↓</Btn>
+          <Btn onClick={() => scrollToId('contact')}>Get in Touch</Btn>
         </motion.div>
 
         {/* Trionn-style interaction hint */}
@@ -1564,7 +1617,7 @@ function Hero() {
             { num: "AI", lbl: "MERN+AI Stack" }
           ].map((stat, i) => (
             <div key={i}>
-              <div className="fd sh-text" style={{ fontSize: '2rem' }}>{stat.num}</div>
+              <div><CountUp value={stat.num} className="fd sh-text" style={{ fontSize: '2rem' }} /></div>
               <div style={{ fontSize: '0.68rem', uppercase: true, letterSpacing: '0.15em', color: 'var(--muted)', marginTop: '0.25rem', textTransform: 'uppercase' }}>{stat.lbl}</div>
             </div>
           ))}
@@ -1582,13 +1635,30 @@ function Hero() {
           </div>
         </div>
 
-      </div>
+      </motion.div>
     </section >
   );
 }
 
+/** One credential of the pinned trust wall — steps in inside its scrub window. */
+function TrustItem({ progress, range, k, v }) {
+  const opacity = useTransform(progress, range, [0, 1]);
+  const y = useTransform(progress, range, [46, 0]);
+  const scale = useTransform(progress, range, [0.82, 1]);
+  const blurPx = useTransform(progress, range, [7, 0]);
+  const filter = useMotionTemplate`blur(${blurPx}px)`;
+  return (
+    <motion.div style={{ opacity, y, scale, filter, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', willChange: 'transform, opacity' }}>
+      <span style={{ fontSize: '0.62rem', letterSpacing: '0.24em', textTransform: 'uppercase', color: 'var(--a1)', fontWeight: 600 }}>{k}</span>
+      <span className="fd" style={{ fontSize: 'clamp(1.5rem, 3.4vw, 2.6rem)', color: 'var(--txt)', whiteSpace: 'nowrap' }}>{v}</span>
+    </motion.div>
+  );
+}
+
 /**
- * Trionn-style credibility wall — minimal uppercase label + name pairs.
+ * Pinned credibility wall: the big bold statement fills the screen first,
+ * then shrinks into a label while each credential steps in one by one,
+ * scrubbed to scroll (scrolling back reverses the sequence).
  */
 function TrustStrip() {
   const items = [
@@ -1598,30 +1668,81 @@ function TrustStrip() {
     { k: 'Leadership', v: 'NASCON' },
     { k: 'Stack', v: 'MERN · AI' },
   ];
+  const ref = useRef(null);
+  const scrollYProgress = usePinProgress(ref);
+
+  // Phase 1: huge statement → shrinks into a small eyebrow label
+  const titleScale = useTransform(scrollYProgress, [0.04, 0.26], [1, 0.3]);
+  const titleOpacity = useTransform(scrollYProgress, [0, 0.05], [0, 1]);
+  // Progress line fills as the credentials arrive
+  const lineScaleX = useTransform(scrollYProgress, [0.3, 0.88], [0, 1]);
+
   return (
-    <section
-      style={{
-        borderTop: '1px solid var(--stroke)',
-        borderBottom: '1px solid var(--stroke)',
-        padding: 'clamp(1.5rem, 4vw, 2.25rem) 0',
-        background: 'rgba(126,184,247,0.015)',
-        position: 'relative',
-        zIndex: 5,
-      }}
-    >
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 1.5rem' }}>
-        <div style={{ textAlign: 'center', fontSize: '0.66rem', letterSpacing: '0.25em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '1.4rem' }}>
-          Trusted across study, research &amp; industry
+    <section ref={ref} style={{ position: 'relative', height: '280vh', zIndex: 5 }}>
+      <div style={{ position: 'sticky', top: 0, minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'clip', padding: '0 1.5rem', gap: 'clamp(2rem, 5vh, 3.5rem)' }}>
+
+        {/* Phase 1: big bold statement, morphs down into the section label */}
+        <motion.h2
+          style={{
+            scale: titleScale,
+            opacity: titleOpacity,
+            textAlign: 'center',
+            fontFamily: "'Familjen Grotesk', 'Inter', sans-serif",
+            fontWeight: 700,
+            fontSize: 'clamp(2rem, 5.6vw, 4.4rem)',
+            lineHeight: 1.08,
+            letterSpacing: '-0.02em',
+            willChange: 'transform',
+            maxWidth: '1000px'
+          }}
+        >
+          Trusted across <span className="fd g-text" style={{ fontWeight: 400 }}>study, research</span>
+          {' '}&amp; <span className="fd g-text" style={{ fontWeight: 400 }}>industry.</span>
+        </motion.h2>
+
+        {/* Phase 2: credentials step in one by one on each scroll increment */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'flex-start', gap: 'clamp(1.75rem, 5.5vw, 4.5rem)', maxWidth: '1100px' }}>
+          {items.map((it, i) => {
+            const start = 0.3 + i * 0.115;
+            return (
+              <TrustItem key={i} progress={scrollYProgress} range={[start, start + 0.105]} k={it.k} v={it.v} />
+            );
+          })}
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 'clamp(1.25rem, 5vw, 3.5rem)' }}>
-          {items.map((it, i) => (
-            <Reveal3D key={i} delay={i * 0.06}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
-                <span style={{ fontSize: '0.58rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--a1)' }}>{it.k}</span>
-                <span className="fd" style={{ fontSize: 'clamp(1.1rem, 3.2vw, 1.6rem)', color: 'var(--txt)', whiteSpace: 'nowrap' }}>{it.v}</span>
-              </div>
-            </Reveal3D>
-          ))}
+
+        {/* Progress line fills left→right as the wall assembles */}
+        <motion.div style={{ scaleX: lineScaleX, transformOrigin: '0% 50%', width: 'min(560px, 78vw)', height: '1px', background: 'var(--G)', boxShadow: '0 0 12px rgba(126,184,247,0.45)' }} />
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Trionn-signature pinned manifesto — the statement stays pinned while
+ * scroll scrubs each word into focus, word by word. Scroll back up and
+ * the reveal rewinds.
+ */
+function Manifesto() {
+  const outerRef = useRef(null);
+  const pinProgress = usePinProgress(outerRef);
+  return (
+    <section ref={outerRef} style={{ position: 'relative', height: '190vh' }}>
+      <div style={{ position: 'sticky', top: 0, minHeight: '100vh', display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+        {/* ambient glow drifting against scroll for depth */}
+        <ParallaxY from={80} to={-80} style={{ position: 'absolute', top: '20%', right: '-10%', pointerEvents: 'none' }}>
+          <div style={{ width: 'min(560px, 70vw)', height: 'min(560px, 70vw)', background: 'radial-gradient(circle, rgba(126,184,247,0.07) 0%, rgba(0,0,0,0) 70%)' }} />
+        </ParallaxY>
+
+        <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '0 1.5rem', position: 'relative', zIndex: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.25em', color: 'var(--a1)', marginBottom: '2rem' }}>
+            <span style={{ width: '24px', height: '1px', background: 'var(--a1)' }} />
+            Manifesto
+          </div>
+          <ScrubText
+            progress={pinProgress}
+            text="I engineer *immersive* digital experiences — blending AI, full-stack systems and 3D interfaces into products that feel *alive,* not just functional."
+            style={{ fontSize: 'clamp(1.8rem, 4.6vw, 3.6rem)', lineHeight: 1.28, fontWeight: 500, letterSpacing: '-0.015em', color: 'var(--txt)' }}
+          />
         </div>
       </div>
     </section>
@@ -1673,6 +1794,8 @@ function TimeCard({ icon, title, sub, period, type, accent }) {
 function About() {
   return (
     <section id="about" style={{ padding: 'clamp(4rem, 10vw, 7rem) 0 clamp(3rem, 8vw, 5rem)', position: 'relative', overflow: 'hidden' }}>
+      {/* Ghost display type drifting with scroll behind the content */}
+      <GhostTitle text="ABOUT" top="1.5rem" dir={1} />
       {/* Decorative blob — clipped by overflow:hidden */}
       <div style={{ position: 'absolute', top: 0, left: '-10%', width: 'min(500px, 80vw)', height: 'min(500px, 80vw)', background: 'radial-gradient(circle, rgba(126,184,247,0.04) 0%, rgba(0,0,0,0) 70%)', pointerEvents: 'none' }} />
 
@@ -1681,8 +1804,9 @@ function About() {
 
         <div className="about-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '4rem', alignItems: 'flex-start' }}>
 
-          {/* Left Summary Identity Block */}
-          <Reveal3D>
+          {/* Left Summary Identity Block — slow parallax lane, scrubs in on scroll */}
+          <ParallaxY from={18} to={-18}>
+          <ScrubIn>
             <Tilt deg={8}>
               <div className="about-card" style={{ background: 'var(--surf)', border: '1px solid var(--stroke)', padding: '2.5rem', borderRadius: '1.5rem', position: 'relative', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', top: 0, right: 0, width: '200px', height: '200px', background: 'radial-gradient(circle, rgba(126,184,247,0.05) 0%, rgba(0,0,0,0) 70%)', pointerEvents: 'none' }} />
@@ -1749,12 +1873,14 @@ function About() {
                 <h3 style={{ fontSize: '1.75rem', fontWeight: '500', marginBottom: '0.25rem' }}>Aakash Ijaz</h3>
                 <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.15em', color: 'var(--a1)', marginBottom: '1.5rem' }}>Software Engineering Student</p>
 
-                <p style={{ color: 'var(--muted)', fontSize: '0.92rem', lineHeight: '1.6', marginBottom: '1rem' }}>
-                  Currently completing a Bachelor of Science in Software Engineering at FAST-NUCES Islamabad (Graduating June 2026). Deeply focused on system engineering strategies, interactive frameworks, and computational modeling.
-                </p>
-                <p style={{ color: 'var(--muted)', fontSize: '0.92rem', lineHeight: '1.6', marginBottom: '2rem' }}>
-                  Experienced as a Full-Stack Web Developer and API systems engineer, combining structural clean architecture with state-driven algorithmic engines.
-                </p>
+                <ScrubText
+                  text="Currently completing a Bachelor of Science in Software Engineering at FAST-NUCES Islamabad (Graduating June 2026). Deeply focused on system engineering strategies, interactive frameworks, and computational modeling."
+                  style={{ color: 'var(--muted)', fontSize: '0.92rem', lineHeight: '1.6', marginBottom: '1rem' }}
+                />
+                <ScrubText
+                  text="Experienced as a Full-Stack Web Developer and API systems engineer, combining structural clean architecture with state-driven algorithmic engines."
+                  style={{ color: 'var(--muted)', fontSize: '0.92rem', lineHeight: '1.6', marginBottom: '2rem' }}
+                />
 
                 <div style={{ borderTop: '1px solid var(--stroke)', paddingTop: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', fontSize: '0.82rem', color: 'var(--txt)' }}>
                   <span>📍 Islamabad, PK</span>
@@ -1765,9 +1891,11 @@ function About() {
                 </div>
               </div>
             </Tilt>
-          </Reveal3D>
+          </ScrubIn>
+          </ParallaxY>
 
-          {/* Right Chronology Timeline Stack */}
+          {/* Right Chronology Timeline Stack — faster parallax lane, cards scrub in one by one */}
+          <ParallaxY from={70} to={-70}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
             {[
               { type: "Education", title: "FAST-NUCES Islamabad", sub: "BSE Bachelor of Software Engineering", period: "2022 — 2026", icon: "⚡", accent: false },
@@ -1775,11 +1903,12 @@ function About() {
               { type: "Professional Experience", title: "Codroon", sub: "Full Stack Developer & API Architect", period: "2025", icon: "⚙️", accent: false },
               { type: "Leadership", title: "NASCON Marathon Node", sub: "Lead Organizer — Web Development Engineering", period: "2025", icon: "◈", accent: false }
             ].map((card, i) => (
-              <Reveal3D key={i} delay={i * 0.1}>
+              <ScrubIn key={i} from={70}>
                 <TimeCard {...card} />
-              </Reveal3D>
+              </ScrubIn>
             ))}
           </div>
+          </ParallaxY>
 
         </div>
       </div>
@@ -1877,7 +2006,7 @@ function PCard({ p }) {
 
             <h3 className="fd pcard-title" style={{ fontSize: '2.5rem', fontWeight: '400', marginBottom: '0.25rem', lineHeight: '1.1' }}>{p.title}</h3>
             <h4 style={{ fontSize: '0.88rem', color: 'var(--a1)', marginBottom: '1.2rem', fontWeight: '500' }}>{p.sub}</h4>
-            <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>{p.desc}</p>
+            <ScrubText text={p.desc} style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '1.5rem' }} />
 
             <ul style={{ listStyleType: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {p.bullets.map((b, i) => (
@@ -1927,6 +2056,275 @@ function PCard({ p }) {
 }
 
 /**
+ * Trionn "services" moment: pinned section where the discipline names
+ * shatter — every character flies outward in 3D as scroll scrubs through,
+ * revealing the statement underneath. Reassembles on scroll-up.
+ */
+function Disciplines() {
+  const ref = useRef(null);
+  const scrollYProgress = usePinProgress(ref);
+  const stmtOpacity = useTransform(scrollYProgress, [0.55, 0.85], [0, 1]);
+  const stmtY = useTransform(scrollYProgress, [0.55, 0.85], [36, 0]);
+  const glowScale = useTransform(scrollYProgress, [0.2, 0.9], [0.7, 1.5]);
+  const glowOpacity = useTransform(scrollYProgress, [0.1, 0.5, 0.95], [0.15, 0.55, 0.85]);
+
+  return (
+    <section ref={ref} style={{ position: 'relative', height: '230vh' }}>
+      <div style={{ position: 'sticky', top: 0, minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '0 1.5rem' }}>
+
+        {/* ── Aesthetic background layers ── */}
+        {/* Drifting constellation particles */}
+        <SectionParticles n={48} />
+        {/* Center glow that swells as the letters shatter */}
+        <motion.div aria-hidden="true" style={{ position: 'absolute', top: '50%', left: '50%', x: '-50%', y: '-50%', width: 'min(760px, 85vw)', height: 'min(760px, 85vw)', scale: glowScale, opacity: glowOpacity, background: 'radial-gradient(circle, rgba(126,184,247,0.14) 0%, rgba(124,58,237,0.08) 45%, rgba(0,0,0,0) 70%)', pointerEvents: 'none', filter: 'blur(10px)' }} />
+        {/* Slow-spinning orbital rings */}
+        <div aria-hidden="true" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 'min(640px, 80vw)', height: 'min(640px, 80vw)', pointerEvents: 'none', opacity: 0.16 }}>
+          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1px solid var(--a1)', animation: 'spin-cw 42s linear infinite' }} />
+          <div style={{ position: 'absolute', inset: '12%', borderRadius: '50%', border: '1px dashed var(--a2)', animation: 'spin-ccw 30s linear infinite' }} />
+          <div style={{ position: 'absolute', inset: '26%', borderRadius: '50%', border: '1px solid rgba(167,139,250,0.6)', animation: 'spin-cw 22s linear infinite' }} />
+        </div>
+        {/* Corner auras drifting against scroll */}
+        <ParallaxY from={90} to={-90} style={{ position: 'absolute', top: '6%', left: '-8%', pointerEvents: 'none' }}>
+          <div style={{ width: 'min(420px, 55vw)', height: 'min(420px, 55vw)', background: 'radial-gradient(circle, rgba(6,182,212,0.09) 0%, rgba(0,0,0,0) 70%)' }} />
+        </ParallaxY>
+        <ParallaxY from={-90} to={90} style={{ position: 'absolute', bottom: '4%', right: '-8%', pointerEvents: 'none' }}>
+          <div style={{ width: 'min(460px, 60vw)', height: 'min(460px, 60vw)', background: 'radial-gradient(circle, rgba(244,114,182,0.08) 0%, rgba(0,0,0,0) 70%)' }} />
+        </ParallaxY>
+
+        <div style={{ fontSize: '0.68rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: 'var(--a1)', marginBottom: '2.5rem', position: 'relative', zIndex: 2 }}>
+          ✦ Different disciplines · One standard of craft
+        </div>
+        <ShatterText
+          progress={scrollYProgress}
+          lines={['A.I.', 'FULL-STACK', '3D · DESIGN']}
+          style={{ fontFamily: "'Familjen Grotesk', 'Inter', sans-serif", fontWeight: 700, fontSize: 'clamp(3rem, 10vw, 8rem)', letterSpacing: '-0.03em', color: 'var(--txt)', position: 'relative', zIndex: 2 }}
+        />
+        {/* Statement revealed inside the debris field */}
+        <motion.p
+          className="fd g-text"
+          style={{ opacity: stmtOpacity, y: stmtY, position: 'absolute', zIndex: 2, fontSize: 'clamp(1.6rem, 4vw, 3rem)', textAlign: 'center', maxWidth: '760px', padding: '0 1.5rem' }}
+        >
+          One engineer. Every layer.
+        </motion.p>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Puzzle-assemble moment (inverse of Disciplines): characters of a tech
+ * word fly IN from scattered 3D positions and lock together as you scroll.
+ */
+function TechAssemble() {
+  const ref = useRef(null);
+  const progress = usePinProgress(ref);
+  const subOpacity = useTransform(progress, [0.68, 0.88], [0, 1]);
+  const subY = useTransform(progress, [0.68, 0.88], [24, 0]);
+
+  return (
+    <section ref={ref} style={{ position: 'relative', height: '200vh' }}>
+      <div style={{ position: 'sticky', top: 0, minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '0 1.5rem', gap: '2.25rem' }}>
+        <div style={{ fontSize: '0.68rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: 'var(--a1)', position: 'relative', zIndex: 2 }}>
+          ⌘ Scroll · watch the pieces lock in
+        </div>
+        <ShatterText
+          mode="assemble"
+          progress={progress}
+          lines={['< ENGINEERED />']}
+          style={{ fontFamily: "'Familjen Grotesk', 'Inter', sans-serif", fontWeight: 700, fontSize: 'clamp(2.4rem, 8.5vw, 7rem)', letterSpacing: '-0.02em', color: 'var(--txt)', position: 'relative', zIndex: 2 }}
+        />
+        <motion.p style={{ opacity: subOpacity, y: subY, color: 'var(--muted)', fontSize: '0.95rem', letterSpacing: '0.04em', textAlign: 'center', position: 'relative', zIndex: 2 }}>
+          Precision, assembled from chaos — <span className="fd g-text" style={{ fontSize: '1.1rem' }}>that's how I build.</span>
+        </motion.p>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Friendly AI greeter — pops up after the visitor has scrolled deep,
+ * types a rotating set of messages, and offers a shortcut to Contact.
+ */
+function AiGreeter() {
+  const [visible, setVisible] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const [msgIdx, setMsgIdx] = useState(0);
+  const [typed, setTyped] = useState('');
+  const messages = [
+    "Hi! I'm ARIA — Aakash's AI assistant 🤖",
+    'Enjoying the 3D? He built every bit of it.',
+    'Got a project or a role in mind?',
+    'Any questions? Feel free to reach out — Aakash replies fast!'
+  ];
+
+  useEffect(() => {
+    const onScroll = () => {
+      const p = window.scrollY / Math.max(1, document.body.scrollHeight - window.innerHeight);
+      if (p > 0.45) setVisible(true);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Typewriter loop
+  useEffect(() => {
+    if (!visible || dismissed) return;
+    const msg = messages[msgIdx];
+    let i = 0;
+    setTyped('');
+    const typeId = setInterval(() => {
+      i += 1;
+      setTyped(msg.slice(0, i));
+      if (i >= msg.length) {
+        clearInterval(typeId);
+        setTimeout(() => setMsgIdx((m) => (m + 1) % messages.length), 3000);
+      }
+    }, 30);
+    return () => clearInterval(typeId);
+  }, [msgIdx, visible, dismissed]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <AnimatePresence>
+      {visible && !dismissed && (
+        <motion.div
+          initial={{ opacity: 0, y: 40, scale: 0.85 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 30, scale: 0.9 }}
+          transition={{ type: 'spring', stiffness: 220, damping: 22 }}
+          style={{
+            position: 'fixed', bottom: '1.5rem', left: '1.25rem', zIndex: 290,
+            display: 'flex', alignItems: 'flex-end', gap: '0.7rem', maxWidth: 'min(320px, calc(100vw - 6rem))'
+          }}
+        >
+          {/* Avatar orb */}
+          <div style={{ position: 'relative', width: '46px', height: '46px', flexShrink: 0 }}>
+            <div style={{ position: 'absolute', inset: '-3px', borderRadius: '50%', background: 'conic-gradient(from 0deg, var(--a1), var(--a2), #a78bfa, var(--a1))', animation: 'spin-cw 5s linear infinite' }} />
+            <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'var(--surf)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
+              🤖
+            </div>
+            <span style={{ position: 'absolute', top: '-1px', right: '-1px', width: '11px', height: '11px', borderRadius: '50%', background: '#10B981', border: '2px solid var(--bg)', animation: 'pulse-dot 2s infinite' }} />
+          </div>
+
+          {/* Speech bubble */}
+          <div style={{
+            background: 'var(--nav-bg)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
+            border: '1px solid var(--nav-border)', borderRadius: '1.1rem 1.1rem 1.1rem 0.25rem',
+            padding: '0.85rem 1rem', boxShadow: '0 12px 40px rgba(0,0,0,0.45)', position: 'relative', flex: 1
+          }}>
+            <button
+              onClick={() => setDismissed(true)}
+              aria-label="Dismiss assistant"
+              style={{ position: 'absolute', top: '0.4rem', right: '0.5rem', background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8rem', lineHeight: 1 }}
+            >
+              ✕
+            </button>
+            <div style={{ fontSize: '0.6rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--a1)', marginBottom: '0.35rem', fontWeight: 700 }}>
+              ARIA · AI Assistant
+            </div>
+            <div style={{ fontSize: '0.84rem', color: 'var(--txt)', lineHeight: 1.5, minHeight: '2.5em' }}>
+              {typed}<span style={{ opacity: 0.7 }}>▌</span>
+            </div>
+            <button
+              onClick={() => scrollToId('contact')}
+              style={{
+                marginTop: '0.6rem', padding: '0.45rem 0.9rem', borderRadius: '99px', border: 'none',
+                background: 'var(--G)', color: '#060608', fontSize: '0.72rem', fontWeight: 700,
+                cursor: 'pointer', fontFamily: "'Inter', sans-serif", letterSpacing: '0.04em'
+              }}
+            >
+              Ask Aakash →
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/**
+ * Pinned horizontal-scroll gallery (desktop): vertical scroll drives the
+ * project cards sideways, trionn-style. Falls back to the original
+ * vertical grid under 1024px.
+ */
+function HorizontalProjects({ children }) {
+  const isNarrow = useIsMobile(1024);
+  const sectionRef = useRef(null);
+  const trackRef = useRef(null);
+  const [range, setRange] = useState(0);
+
+  useEffect(() => {
+    if (isNarrow) return;
+    const measure = () => {
+      const track = trackRef.current;
+      if (!track || !track.parentElement) return;
+      setRange(Math.max(0, track.scrollWidth - track.parentElement.clientWidth));
+    };
+    measure();
+    // re-measure after fonts/images settle
+    const t = setTimeout(measure, 900);
+    window.addEventListener('resize', measure);
+    return () => { clearTimeout(t); window.removeEventListener('resize', measure); };
+  }, [isNarrow]);
+
+  const scrollYProgress = usePinProgress(sectionRef);
+  const x = useTransform(scrollYProgress, [0, 1], [0, -range]);
+
+  if (isNarrow) {
+    return (
+      <div className="projects-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '1.5rem', width: '100%' }}>
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={sectionRef} style={{ height: `calc(100vh + ${range}px)`, position: 'relative' }}>
+      <div style={{ position: 'sticky', top: 0, height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden' }}>
+        <div style={{ fontSize: '0.66rem', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'var(--muted)', padding: '0 max(calc((100vw - 1100px) / 2), 1.5rem)', marginBottom: '1.25rem' }}>
+          Scroll to explore ⟶
+        </div>
+        <motion.div ref={trackRef} style={{ x, display: 'flex', alignItems: 'stretch', gap: '2rem', padding: '0 max(calc((100vw - 1100px) / 2), 1.5rem)', willChange: 'transform' }}>
+          {React.Children.map(children, (child) => (
+            <div style={{ width: 'min(720px, 74vw)', flexShrink: 0, display: 'flex' }}>
+              <div style={{ width: '100%' }}>{child}</div>
+            </div>
+          ))}
+        </motion.div>
+      </div>
+    </div>
+  );
+}
+
+/** Live local clock for the footer ledger (updates every second). */
+function LiveClock() {
+  const [now, setNow] = useState('');
+  useEffect(() => {
+    const tick = () => setNow(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Karachi' }));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <span style={{ fontFamily: 'monospace', letterSpacing: '0.08em' }}>PKT → {now}</span>;
+}
+
+/**
+ * Huge hollow-type marquee divider — reacts to scroll velocity like the
+ * contact band, but rendered as outlined display type.
+ */
+function WorksMarquee() {
+  return (
+    <div aria-hidden="true" style={{ padding: 'clamp(1.5rem, 4vw, 3rem) 0 0', position: 'relative', zIndex: 1 }}>
+      <VelocityMarquee
+        items={['SELECTED WORKS', '✦', 'ARCHITECTED SYSTEMS', '✦', 'AI · FULL-STACK · 3D', '✦']}
+        itemClassName="outline-text"
+        itemStyle={{ fontSize: 'clamp(3rem, 9vw, 7.5rem)', lineHeight: 1.05, letterSpacing: '-0.02em' }}
+        speed={7}
+      />
+    </div>
+  );
+}
+
+/**
  * Defers loading/mounting the heavy three.js carousel until the user
  * scrolls near it — keeps first paint fast, especially on mobile.
  */
@@ -1958,25 +2356,31 @@ function Lazy3DProjects({ items }) {
 
 function Projects() {
   const dataset = [
-    { id: "01", title: "Tahqiiq", sub: "AI Legal Document Analyzer", type: "Final Year Project", year: "2026", col: 7, desc: "Architected a distributed intelligent validation layer dedicated to corporate legal analysis, parsing structural vulnerabilities, and cross-checking ambiguity vectors.", bullets: ["Built custom risk extraction engines", "Integrated contextual embedding pipelines", "Optimized zero-latency client data parsing"], tags: ["React", "FastAPI", "NLP", "LangChain", "MERN"], accent: "#7EB8F7" },
-    { id: "02", title: "CRM Platform", sub: "Enterprise Relationship Node", type: "Professional Work", year: "2025", col: 5, desc: "Constructed an automated high-throughput commercial architecture handling large data objects seamlessly, designed with secure API routes.", bullets: ["Managed complex relational structures", "Configured state-driven telemetry hooks", "Implemented multi-tier data security models"], tags: ["Next.js", "Express", "MongoDB", "Node"], accent: "#4A90D9" },
-    { id: "03", title: "Forecasting Engine", sub: "Deep Learning Predictive Analytics", type: "Research Lab", year: "2025", col: 5, desc: "Engineered sequential machine learning modules structured to output temporal tracking projections using LSTM networks.", bullets: ["Formulated multivariate pipeline models", "Evaluated structural time-series arrays", "Optimized gradient processing functions"], tags: ["Python", "PyTorch", "LSTM", "ARIMA", "FAISS"], accent: "#9DC8FF" },
-    { id: "04", title: "Hospital ERP", sub: "Full-Stack Medical Operations Platform", type: "Full-Stack Project", year: "2025", col: 7, desc: "Formulated complete administrative infrastructure tracking internal processes, patient workflows, and specialized access nodes.", bullets: ["Optimized data object relationships", "Designed granular session layers", "Rendered instantaneous updates via socket streams"], tags: ["React", "Node.js", "Express", "MongoDB"], accent: "#7EB8F7" },
-    { id: "05", title: "NASCON Node", sub: "High-Traffic Registration Platform", type: "Leadership Event", year: "2025", col: 12, desc: "Engineered a rapid transactional orchestration system supporting extensive user registration processes for a major technical event without operational downtime.", bullets: ["Scaled runtime server handling architecture", "Managed complex real-time checkouts", "Deployed dynamic analytical reporting grids"], tags: ["React", "Vite", "Node.js", "Tailwind Engine", "Railway"], accent: "#4A90D9" }
+    { id: "01", title: "Tahqiiq", sub: "AI Legal Document Analyzer", type: "Final Year Project", year: "2026", col: 7, desc: "Architected a distributed intelligent validation layer dedicated to corporate legal analysis, parsing structural vulnerabilities, and cross-checking ambiguity vectors.", bullets: ["Built custom risk extraction engines", "Integrated contextual embedding pipelines", "Optimized zero-latency client data parsing"], tags: ["React", "FastAPI", "NLP", "LangChain", "MERN"], accent: "#8b5cf6" },
+    { id: "02", title: "CRM Platform", sub: "Enterprise Relationship Node", type: "Professional Work", year: "2025", col: 5, desc: "Constructed an automated high-throughput commercial architecture handling large data objects seamlessly, designed with secure API routes.", bullets: ["Managed complex relational structures", "Configured state-driven telemetry hooks", "Implemented multi-tier data security models"], tags: ["Next.js", "Express", "MongoDB", "Node"], accent: "#22d3ee" },
+    { id: "03", title: "Forecasting Engine", sub: "Deep Learning Predictive Analytics", type: "Research Lab", year: "2025", col: 5, desc: "Engineered sequential machine learning modules structured to output temporal tracking projections using LSTM networks.", bullets: ["Formulated multivariate pipeline models", "Evaluated structural time-series arrays", "Optimized gradient processing functions"], tags: ["Python", "PyTorch", "LSTM", "ARIMA", "FAISS"], accent: "#f472b6" },
+    { id: "04", title: "Hospital ERP", sub: "Full-Stack Medical Operations Platform", type: "Full-Stack Project", year: "2025", col: 7, desc: "Formulated complete administrative infrastructure tracking internal processes, patient workflows, and specialized access nodes.", bullets: ["Optimized data object relationships", "Designed granular session layers", "Rendered instantaneous updates via socket streams"], tags: ["React", "Node.js", "Express", "MongoDB"], accent: "#34d399" },
+    { id: "05", title: "NASCON Node", sub: "High-Traffic Registration Platform", type: "Leadership Event", year: "2025", col: 12, desc: "Engineered a rapid transactional orchestration system supporting extensive user registration processes for a major technical event without operational downtime.", bullets: ["Scaled runtime server handling architecture", "Managed complex real-time checkouts", "Deployed dynamic analytical reporting grids"], tags: ["React", "Vite", "Node.js", "Tailwind Engine", "Railway"], accent: "#7EB8F7" }
   ];
 
   return (
-    <section id="projects" style={{ padding: '6rem 0', overflow: 'hidden' }}>
-      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 1.5rem' }}>
+    // overflow clip (not hidden) — hidden would break the sticky horizontal gallery
+    <section id="projects" style={{ padding: '6rem 0', overflow: 'clip', position: 'relative' }}>
+      <GhostTitle text="WORKS" top="1rem" dir={-1} />
+      <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '0 1.5rem', position: 'relative', zIndex: 1 }}>
         <SHead eyebrow="Selected Works" heading="Architected" italic="Systems" />
 
-        {/* Cinematic interactive 3D glass carousel (lazy-loaded) */}
-        <Lazy3DProjects items={dataset} />
+        {/* Cinematic interactive 3D glass carousel (lazy-loaded), zooming in on scroll */}
+        <ScrubZoom from={0.9}>
+          <Lazy3DProjects items={dataset} />
+        </ScrubZoom>
 
-        <div className="projects-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '1.5rem', width: '100%' }}>
-          {dataset.map((p) => <PCard key={p.id} p={p} />)}
-        </div>
       </div>
+
+      {/* Pinned horizontal work gallery — vertical scroll drives cards sideways */}
+      <HorizontalProjects>
+        {dataset.map((p) => <PCard key={p.id} p={p} />)}
+      </HorizontalProjects>
     </section>
   );
 }
@@ -2072,13 +2476,15 @@ function Skills() {
 
   return (
     <section id="skills" style={{ padding: '6rem 0', position: 'relative', overflow: 'hidden' }}>
+      <GhostTitle text="ARSENAL" top="1rem" dir={1} />
       {/* Ambient background glows — clipped by overflow:hidden */}
       <div style={{ position: 'absolute', top: '20%', left: '-10%', width: 'min(500px, 70vw)', height: 'min(500px, 70vw)', background: 'radial-gradient(circle, rgba(126,184,247,0.04) 0%, rgba(0,0,0,0) 70%)', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: '10%', right: '-5%', width: 'min(400px, 60vw)', height: 'min(400px, 60vw)', background: 'radial-gradient(circle, rgba(167,139,250,0.04) 0%, rgba(0,0,0,0) 70%)', pointerEvents: 'none' }} />
 
-      <div style={{ maxWidth: '1140px', margin: '0 auto', padding: '0 1.5rem' }}>
+      <div style={{ maxWidth: '1140px', margin: '0 auto', padding: '0 1.5rem', position: 'relative', zIndex: 1 }}>
         <SHead eyebrow="Capabilities" heading="Technical" italic="Index" />
 
+        <ScrubZoom from={0.94}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '1.5rem' }}>
           {schema.map((block, i) => (
             <Reveal3D key={i} delay={i * 0.07}>
@@ -2160,6 +2566,7 @@ function Skills() {
             </Reveal3D>
           ))}
         </div>
+        </ScrubZoom>
       </div>
     </section>
   );
@@ -2503,14 +2910,11 @@ function InteractiveBand() {
           Interactive · Dare to touch
         </motion.div>
 
-        <motion.h2
-          initial={{ opacity: 0, y: 36, filter: 'blur(8px)' }}
-          animate={isInView ? { opacity: 1, y: 0, filter: 'blur(0px)' } : {}}
-          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-          style={{ fontSize: 'clamp(2.4rem, 8vw, 6rem)', fontWeight: '700', lineHeight: '1.02', letterSpacing: '-0.02em' }}
-        >
-          Designed to <span className="fd g-text" style={{ fontWeight: '400' }}>mean something.</span>
-        </motion.h2>
+        {/* Scroll-scrubbed statement — each word sharpens as you scroll through */}
+        <ScrubText
+          text="Designed to *mean* *something.*"
+          style={{ fontSize: 'clamp(2.4rem, 8vw, 6rem)', fontWeight: '700', lineHeight: '1.06', letterSpacing: '-0.02em' }}
+        />
 
         <motion.p
           initial={{ opacity: 0 }}
@@ -2538,18 +2942,13 @@ function Contact() {
         <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'var(--G)', filter: 'blur(8px)', position: 'absolute', top: '85px', left: '85px' }} />
       </div>
 
-      {/* Single Marquee Banner — Row 1 only */}
-      <div style={{ width: '100%', overflow: 'hidden', position: 'relative', marginBottom: '5rem' }}>
-        <div style={{ borderTop: '1px solid var(--stroke)', borderBottom: '1px solid var(--stroke)', padding: '1.1rem 0', background: 'rgba(6,6,8,0.5)', overflow: 'hidden' }}>
-          <div className="contact-marquee" style={{ display: 'flex', width: '200%', animation: 'mq 28s linear infinite' }}>
-            {[1, 2].map(k => (
-              <div key={k} style={{ display: 'flex', width: '100%', whiteSpace: 'nowrap', gap: '3rem', alignItems: 'center' }}>
-                {["LET'S BUILD SOMETHING GREAT ✦", 'FULL·STACK · AI · ENGINEER ✦', 'OPEN TO WORK · ISLAMABAD · PK ✦', 'REACT · NODE · PYTHON · PYTORCH ✦', "LET'S BUILD SOMETHING GREAT ✦", 'MERN STACK · FAST API · ML ✦'].map((t, i) => (
-                  <span key={i} className="fd sh-text" style={{ fontSize: 'clamp(1rem, 2.2vw, 1.6rem)', fontWeight: '400', letterSpacing: '0.08em', flexShrink: 0 }}>{t}</span>
-                ))}
-              </div>
-            ))}
-          </div>
+      {/* Scroll-velocity marquee — whips faster with your scroll, reverses when you scroll up */}
+      <div className="contact-marquee" style={{ width: '100%', position: 'relative', marginBottom: '5rem' }}>
+        <div style={{ borderTop: '1px solid var(--stroke)', borderBottom: '1px solid var(--stroke)', padding: '1.1rem 0', background: 'rgba(6,6,8,0.5)' }}>
+          <VelocityMarquee
+            items={["LET'S BUILD SOMETHING GREAT ✦", 'FULL·STACK · AI · ENGINEER ✦', 'OPEN TO WORK · ISLAMABAD · PK ✦', 'REACT · NODE · PYTHON · PYTORCH ✦', 'MERN STACK · FAST API · ML ✦']}
+            itemStyle={{ fontSize: 'clamp(1rem, 2.2vw, 1.6rem)', fontWeight: '400', letterSpacing: '0.08em' }}
+          />
         </div>
       </div>
 
@@ -2557,11 +2956,15 @@ function Contact() {
 
         <Tilt deg={4}>
           <h2 className="fd" style={{ fontSize: 'clamp(2.4rem, 7vw, 5.5rem)', fontWeight: '400', lineHeight: '1.1', marginBottom: '3.5rem' }}>
-            Let's build something <span className="g-text">great.</span>
+            <SplitReveal text="Let's build something" per="word" duration={1.1} />{' '}
+            <span className="g-text">
+              <SplitReveal text="great." per="char" delay={0.4} duration={1.1} />
+            </span>
           </h2>
         </Tilt>
 
         {/* Contact Links Grid Layout */}
+        <ScrubZoom from={0.93} style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
         <div className="contact-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '1.2rem', width: '100%', maxWidth: '960px', marginBottom: '4rem' }}>
           {[
             { tag: "EMAIL", val: "aakashijaz2002@gmail.com", url: "mailto:aakashijaz2002@gmail.com", emo: "✉️" },
@@ -2606,18 +3009,28 @@ function Contact() {
             </motion.a>
           ))}
         </div>
+        </ScrubZoom>
 
         {/* Stay in Touch — Contact Form */}
-        <div style={{ width: '100%', maxWidth: '620px', marginTop: '1rem', marginBottom: '2rem' }}>
+        <ScrubZoom from={0.94} style={{ width: '100%', maxWidth: '620px', marginTop: '1rem', marginBottom: '2rem' }}>
           <p style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.2em', color: 'var(--a1)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <span style={{ width: '24px', height: '1px', background: 'var(--a1)' }}></span>
             Stay In Touch
           </p>
           <ContactForm />
+        </ScrubZoom>
+
+        {/* Interactive sound lines — hover plays a pentatonic scale */}
+        <div style={{ width: '100%', maxWidth: '720px', marginTop: '5rem' }}>
+          <div style={{ fontSize: '0.62rem', letterSpacing: '0.28em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '1.25rem' }}>
+            ✦ Play the lines
+          </div>
+          <SoundLines />
         </div>
 
         {/* Footer Real-Time Ledger Base Bar */}
-        <div style={{ width: '100%', borderTop: '1px solid var(--stroke)', marginTop: '6rem', paddingTop: '2rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '1.5rem', fontSize: '0.82rem', color: 'var(--muted)', textAlign: 'center' }}>
+        <div style={{ width: '100%', borderTop: '1px solid var(--stroke)', marginTop: '4rem', paddingTop: '2rem', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '1.5rem', fontSize: '0.82rem', color: 'var(--muted)', textAlign: 'center' }}>
+          <LiveClock />
           <div style={{ display: 'flex', gap: '1.5rem' }}>
             <a href="https://linkedin.com" style={{ color: 'inherit', textDecoration: 'none' }}>LinkedIn</a>
             <a href="https://github.com" style={{ color: 'inherit', textDecoration: 'none' }}>GitHub</a>
@@ -2630,7 +3043,7 @@ function Contact() {
           </div>
 
           <div>
-            © 2026 Aakash Ijaz · Built with React & Framer Motion
+            © 2026 Aakash Ijaz · Built with React · Three.js · Lenis
           </div>
         </div>
 
@@ -2668,17 +3081,24 @@ export default function App() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6 }}
         >
+          <SmoothScroll />
           <AuroraBackground />
+          <div className="noise-overlay" aria-hidden="true" />
           <ScrollProgress />
           <CustomCursor />
           <Navbar theme={theme} toggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')} />
           <Hero />
           <TrustStrip />
+          <Manifesto />
           <About />
+          <WorksMarquee />
           <Projects />
           <Skills />
+          <Disciplines />
+          <TechAssemble />
           <InteractiveBand />
           <Contact />
+          <AiGreeter />
           <ScrollToTop />
         </motion.div>
       )}
